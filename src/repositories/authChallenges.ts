@@ -1,0 +1,114 @@
+/**
+ * Postgres-backed AuthChallengesRepo.
+ */
+
+import { and, eq } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
+import { authChallenges } from '../db/schema.js';
+import type {
+  AuthChallenge,
+  AuthChallengesRepo,
+  ChallengePurpose,
+  ChallengeStatus,
+  Factor,
+} from './types.js';
+
+function rowToChallenge(r: {
+  id: string;
+  accountId: string | null;
+  appId: string;
+  factor: string;
+  purpose: string;
+  otpHash: string | null;
+  attemptsUsed: number;
+  status: string;
+  expiresAt: Date;
+  consumedAt: Date | null;
+  intendedOperation: string | null;
+  operationAudience: string | null;
+  operationRiskTier: string | null;
+  createdAt: Date;
+}): AuthChallenge {
+  return {
+    id: r.id,
+    accountId: r.accountId,
+    appId: r.appId,
+    factor: r.factor as Factor,
+    purpose: r.purpose as ChallengePurpose,
+    otpHash: r.otpHash,
+    attemptsUsed: r.attemptsUsed,
+    status: r.status as ChallengeStatus,
+    expiresAt: r.expiresAt,
+    consumedAt: r.consumedAt,
+    intendedOperation: r.intendedOperation,
+    operationAudience: r.operationAudience,
+    operationRiskTier: r.operationRiskTier as AuthChallenge['operationRiskTier'],
+    createdAt: r.createdAt,
+  };
+}
+
+export function createPgAuthChallengesRepo(db: Db): AuthChallengesRepo {
+  return {
+    async create(input) {
+      const [row] = await db
+        .insert(authChallenges)
+        .values({
+          id: input.id,
+          accountId: input.accountId,
+          appId: input.appId,
+          factor: input.factor,
+          purpose: input.purpose,
+          otpHash: input.otpHash,
+          expiresAt: input.expiresAt,
+          intendedOperation: input.intendedOperation,
+          operationAudience: input.operationAudience,
+          operationRiskTier: input.operationRiskTier,
+        })
+        .returning();
+      if (!row) throw new Error('auth_challenges insert returned no row');
+      return rowToChallenge(row);
+    },
+
+    async findById(id) {
+      const rows = await db
+        .select()
+        .from(authChallenges)
+        .where(eq(authChallenges.id, id))
+        .limit(1);
+      const r = rows[0];
+      return r ? rowToChallenge(r) : null;
+    },
+
+    async recordAttempt(id, next) {
+      return db.transaction(async (tx) => {
+        const rows = await tx
+          .select()
+          .from(authChallenges)
+          .where(eq(authChallenges.id, id))
+          .for('update')
+          .limit(1);
+        const cur = rows[0];
+        if (!cur) return null;
+        if (cur.status !== 'pending') {
+          // Stable read of terminal challenge.
+          return rowToChallenge(cur);
+        }
+        const newAttempts = next.incrementAttempts ? cur.attemptsUsed + 1 : cur.attemptsUsed;
+        await tx
+          .update(authChallenges)
+          .set({
+            attemptsUsed: newAttempts,
+            status: next.status,
+            consumedAt: next.consumedAt,
+          })
+          .where(and(eq(authChallenges.id, id), eq(authChallenges.status, 'pending')));
+        return rowToChallenge({
+          ...cur,
+          attemptsUsed: newAttempts,
+          status: next.status,
+          consumedAt: next.consumedAt,
+        });
+      });
+    },
+  };
+}
