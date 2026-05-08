@@ -20,6 +20,7 @@ import { createPgSessionsRepo } from './repositories/sessions.js';
 import { createPgStepUpTokensRepo } from './repositories/stepUpTokens.js';
 import { createPgPhoneTokensRepo } from './repositories/phoneTokens.js';
 import { createPgKycRecordsRepo } from './repositories/kycRecords.js';
+import { createPgPhoneChangesRepo } from './repositories/phoneChanges.js';
 import { createDbAuditLogger } from './services/auditLogger.js';
 import {
   InMemoryEventProducer,
@@ -31,6 +32,7 @@ import { createJwtSigner } from './services/jwtSigner.js';
 import { createPhoneTokenSigner } from './services/phoneTokenSigner.js';
 import { createStubIprsService } from './services/iprsService.js';
 import { createKycHasher } from './services/kycHash.js';
+import { createStepupVerifier } from './services/stepupVerifier.js';
 import { buildApp } from './app.js';
 
 async function main(): Promise<void> {
@@ -46,6 +48,7 @@ async function main(): Promise<void> {
   const stepUpTokensRepo = createPgStepUpTokensRepo(db);
   const phoneTokensRepo = createPgPhoneTokensRepo(db);
   const kycRecordsRepo = createPgKycRecordsRepo(db);
+  const phoneChangesRepo = createPgPhoneChangesRepo(db);
   const kycHasher = createKycHasher(env.KYC_HASH_SALT);
 
   // IPRS Track A access not provisioned at v1.0 build time. The stub is the
@@ -83,6 +86,11 @@ async function main(): Promise<void> {
     signingKey: phoneTokenSigningKey,
     issuer: env.JWT_ISSUER,
   });
+  const stepupVerifier = createStepupVerifier({
+    jwtKeys: [jwtKeyPair],
+    stepUpTokensRepo,
+    issuer: env.JWT_ISSUER,
+  });
 
   let eventProducer: EventProducer;
   if (env.KAFKA_BROKERS.length > 0) {
@@ -110,6 +118,7 @@ async function main(): Promise<void> {
     stepUpTokensRepo,
     phoneTokensRepo,
     kycRecordsRepo,
+    phoneChangesRepo,
     phoneCrypto,
     eventProducer,
     auditLogger,
@@ -118,6 +127,7 @@ async function main(): Promise<void> {
     phoneTokenSigner,
     iprsService,
     kycHasher,
+    stepupVerifier,
     logger,
   });
 

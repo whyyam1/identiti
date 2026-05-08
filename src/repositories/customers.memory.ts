@@ -19,6 +19,8 @@ interface StoredAccount {
   lastActiveAt: Date | null;
   phoneHash: string;
   phoneEncrypted: string;
+  phoneCooldownUntil: Date | null;
+  phoneLastChangeAt: Date;
 }
 
 export function createMemoryCustomersRepo(): CustomersRepo {
@@ -30,16 +32,19 @@ export function createMemoryCustomersRepo(): CustomersRepo {
       if (phoneHashes.has(input.phoneHash)) {
         return { kind: 'phone_collision' };
       }
+      const now = new Date();
       const stored: StoredAccount = {
         accountUuid: input.accountUuid,
         state: 'pending_onboarding',
         tier: 'tier_0',
         tierAssignedAt: null,
         tierReason: null,
-        createdAt: new Date(),
+        createdAt: now,
         lastActiveAt: null,
         phoneHash: input.phoneHash,
         phoneEncrypted: input.phoneEncrypted,
+        phoneCooldownUntil: null,
+        phoneLastChangeAt: now,
       };
       accounts.set(input.accountUuid, stored);
       phoneHashes.set(input.phoneHash, input.accountUuid);
@@ -77,6 +82,35 @@ export function createMemoryCustomersRepo(): CustomersRepo {
     async findEncryptedPhoneFor(accountUuid) {
       const a = accounts.get(accountUuid);
       return a?.phoneEncrypted ?? null;
+    },
+
+    async getPhoneRecord(accountUuid) {
+      const a = accounts.get(accountUuid);
+      if (!a) return null;
+      return {
+        phoneHash: a.phoneHash,
+        phoneEncrypted: a.phoneEncrypted,
+        cooldownUntil: a.phoneCooldownUntil,
+        lastChangeAt: a.phoneLastChangeAt,
+      };
+    },
+
+    async swapPhone(accountUuid, input) {
+      const a = accounts.get(accountUuid);
+      if (!a) return null;
+      // Maintain the phoneHashes secondary index for findByPhoneHash.
+      phoneHashes.delete(a.phoneHash);
+      a.phoneHash = input.newPhoneHash;
+      a.phoneEncrypted = input.newPhoneEncrypted;
+      a.phoneCooldownUntil = input.cooldownUntil;
+      a.phoneLastChangeAt = new Date();
+      phoneHashes.set(a.phoneHash, a.accountUuid);
+      return {
+        phoneHash: a.phoneHash,
+        phoneEncrypted: a.phoneEncrypted,
+        cooldownUntil: a.phoneCooldownUntil,
+        lastChangeAt: a.phoneLastChangeAt,
+      };
     },
 
     async changeState(accountUuid, fromStates, toState) {

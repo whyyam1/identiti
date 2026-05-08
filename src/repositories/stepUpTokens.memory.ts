@@ -4,10 +4,15 @@
 
 import type { StepUpTokenInsert, StepUpTokensRepo } from './types.js';
 
+interface StoredStepUpToken {
+  insert: StepUpTokenInsert;
+  consumedAt: Date | null;
+}
+
 export function createMemoryStepUpTokensRepo(): StepUpTokensRepo & {
   list: () => readonly StepUpTokenInsert[];
 } {
-  const data = new Map<string, StepUpTokenInsert>();
+  const data = new Map<string, StoredStepUpToken>();
   return {
     async create(input) {
       if (data.has(input.jti)) {
@@ -15,15 +20,26 @@ export function createMemoryStepUpTokensRepo(): StepUpTokensRepo & {
         throw new Error(`step_up_tokens: jti ${input.jti} already exists`);
       }
       data.set(input.jti, {
-        ...input,
-        ...(input.actor ? { actor: { ...input.actor } } : {}),
+        insert: {
+          ...input,
+          ...(input.actor ? { actor: { ...input.actor } } : {}),
+        },
+        consumedAt: null,
       });
     },
     async findByJti(jti) {
       const r = data.get(jti);
       if (!r) return null;
-      return { ...r, ...(r.actor ? { actor: { ...r.actor } } : {}) };
+      const { insert } = r;
+      return { ...insert, ...(insert.actor ? { actor: { ...insert.actor } } : {}) };
     },
-    list: () => Array.from(data.values()),
+    async markConsumed(jti, consumedAt) {
+      const r = data.get(jti);
+      if (!r) return false;
+      if (r.consumedAt) return false;
+      r.consumedAt = consumedAt;
+      return true;
+    },
+    list: () => Array.from(data.values()).map((r) => r.insert),
   };
 }

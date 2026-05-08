@@ -137,6 +137,52 @@ export function createPgCustomersRepo(db: Db): CustomersRepo {
       return r ? r.phoneEncrypted : null;
     },
 
+    async getPhoneRecord(accountUuid) {
+      const rows = await db
+        .select({
+          phoneHash: phoneRecords.phoneHash,
+          phoneEncrypted: phoneRecords.phoneEncrypted,
+          cooldownUntil: phoneRecords.cooldownUntil,
+          lastChangeAt: phoneRecords.lastChangeAt,
+        })
+        .from(phoneRecords)
+        .where(eq(phoneRecords.accountId, accountUuid))
+        .limit(1);
+      const r = rows[0];
+      if (!r) return null;
+      return {
+        phoneHash: r.phoneHash,
+        phoneEncrypted: r.phoneEncrypted,
+        cooldownUntil: r.cooldownUntil,
+        lastChangeAt: r.lastChangeAt,
+      };
+    },
+
+    async swapPhone(accountUuid, input) {
+      const [row] = await db
+        .update(phoneRecords)
+        .set({
+          phoneHash: input.newPhoneHash,
+          phoneEncrypted: input.newPhoneEncrypted,
+          cooldownUntil: input.cooldownUntil,
+          lastChangeAt: sql`NOW()`,
+        })
+        .where(eq(phoneRecords.accountId, accountUuid))
+        .returning({
+          phoneHash: phoneRecords.phoneHash,
+          phoneEncrypted: phoneRecords.phoneEncrypted,
+          cooldownUntil: phoneRecords.cooldownUntil,
+          lastChangeAt: phoneRecords.lastChangeAt,
+        });
+      if (!row) return null;
+      return {
+        phoneHash: row.phoneHash,
+        phoneEncrypted: row.phoneEncrypted,
+        cooldownUntil: row.cooldownUntil,
+        lastChangeAt: row.lastChangeAt,
+      };
+    },
+
     async changeState(accountUuid, fromStates, toState) {
       return db.transaction(async (tx) => {
         const rows = await tx

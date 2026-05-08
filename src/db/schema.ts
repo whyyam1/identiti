@@ -6,6 +6,7 @@
  * Phase 4 (Sprint 6):    kyc_records.
  * Phase 5 (Sprint 4):    step_up_tokens (with Amendment §A.1 columns).
  * Phase 6 (Sprint 5):    phone_tokens.
+ * Phase 7 (Sprint 7):    phone_changes; step_up_tokens.consumed_at.
  *
  * Per Instruction Pack §3 (universal conventions) + §6.2 (Identiti-specific).
  */
@@ -259,12 +260,44 @@ export const stepUpTokens = pgTable(
     initiatedBy: text('initiated_by'),
     iat: timestamp('iat', { withTimezone: true }).notNull(),
     exp: timestamp('exp', { withTimezone: true }).notNull(),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     accountExpIdx: index('step_up_tokens_account_exp_idx').on(t.accountUuid, t.exp),
     delegatedAuthorityIdx: index('step_up_tokens_delegated_authority_idx').on(
       t.delegatedAuthorityJti
+    ),
+  })
+);
+
+// ─── Sprint 7 (Phase 7) — phone-change ledger ────────────────────────────
+
+export const phoneChanges = pgTable(
+  'phone_changes',
+  {
+    id: text('id').primaryKey(),
+    accountId: text('account_id').notNull(),
+    state: text('state').notNull().default('cooldown_active'),
+    verificationMethod: text('verification_method').notNull(),
+    newPhoneHash: text('new_phone_hash').notNull(),
+    newPhoneEncrypted: text('new_phone_encrypted').notNull(),
+    challengeOldId: text('challenge_old_id'),
+    challengeNewId: text('challenge_new_id'),
+    authorisingStepupJti: text('authorising_stepup_jti').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    initiatedAt: timestamp('initiated_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    cancelReason: text('cancel_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    accountStateIdx: index('phone_changes_account_state_idx').on(
+      t.accountId,
+      t.state,
+      t.expiresAt
     ),
   })
 );

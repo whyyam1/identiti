@@ -72,12 +72,29 @@ export interface TierChangeResult {
   reason: string;
 }
 
+export interface PhoneRecord {
+  phoneHash: string;
+  phoneEncrypted: string;
+  cooldownUntil: Date | null;
+  lastChangeAt: Date;
+}
+
+export interface SwapPhoneInput {
+  newPhoneHash: string;
+  newPhoneEncrypted: string;
+  cooldownUntil: Date;
+}
+
 export interface CustomersRepo {
   create(input: CustomerInsert): Promise<CreateResult>;
   findById(accountUuid: string): Promise<CustomerRow | null>;
   findByPhoneHash(phoneHash: string): Promise<{ accountUuid: string } | null>;
   /** AES-256-GCM ciphertext of the bound phone, base64. Phase 6 phone-token resolve. */
   findEncryptedPhoneFor(accountUuid: string): Promise<string | null>;
+  /** Phase 7 phone change: read the bound phone record (hash + ciphertext + cooldown). */
+  getPhoneRecord(accountUuid: string): Promise<PhoneRecord | null>;
+  /** Phase 7 phone change: atomically swap the bound phone and reset cooldown. */
+  swapPhone(accountUuid: string, input: SwapPhoneInput): Promise<PhoneRecord | null>;
   changeState(
     accountUuid: string,
     fromStates: readonly AccountState[],
@@ -190,6 +207,50 @@ export interface StepUpTokenInsert {
 export interface StepUpTokensRepo {
   create(input: StepUpTokenInsert): Promise<void>;
   findByJti(jti: string): Promise<StepUpTokenInsert | null>;
+  /**
+   * Atomically mark a token consumed. Returns true on first call; false if the
+   * token was already consumed (caller should reject as `replay_detected` per
+   * Schema Appendix §16.3 step 12).
+   */
+  markConsumed(jti: string, consumedAt: Date): Promise<boolean>;
+}
+
+// ─── PhoneChangesRepo ─────────────────────────────────────────────────────
+
+export type PhoneChangeState = 'initiated' | 'cooldown_active' | 'completed' | 'cancelled';
+export type PhoneChangeVerificationMethod =
+  | 'otp_to_old_phone'
+  | 'otp_to_new_phone_with_step_up_to_old';
+
+export interface PhoneChangeInsert {
+  id: string;
+  accountId: string;
+  state: PhoneChangeState;
+  verificationMethod: PhoneChangeVerificationMethod;
+  newPhoneHash: string;
+  newPhoneEncrypted: string;
+  challengeOldId: string | null;
+  challengeNewId: string | null;
+  authorisingStepupJti: string;
+  expiresAt: Date;
+}
+
+export interface PhoneChange extends PhoneChangeInsert {
+  initiatedAt: Date;
+  completedAt: Date | null;
+  cancelledAt: Date | null;
+  cancelReason: string | null;
+  createdAt: Date;
+}
+
+export interface PhoneChangesRepo {
+  create(input: PhoneChangeInsert): Promise<PhoneChange>;
+  findById(id: string): Promise<PhoneChange | null>;
+  findActiveForAccount(accountId: string): Promise<PhoneChange | null>;
+  /** Marks state='completed', sets completed_at; returns the updated record or null if not in cooldown_active. */
+  complete(id: string, completedAt: Date): Promise<PhoneChange | null>;
+  /** Marks state='cancelled', sets cancel_reason; returns the updated record or null if already terminal. */
+  cancel(id: string, reason: string, cancelledAt: Date): Promise<PhoneChange | null>;
 }
 
 // ─── KycRecordsRepo ───────────────────────────────────────────────────────

@@ -24,6 +24,7 @@ import { authRoutes } from './routes/auth.js';
 import { tierRoutes } from './routes/tier.js';
 import { stepupRoutes } from './routes/stepup.js';
 import { phoneTokensRoutes } from './routes/phoneTokens.js';
+import { phoneChangeRoutes } from './routes/phoneChange.js';
 import { kycRoutes } from './routes/kyc.js';
 import type { Env } from './config/env.js';
 import type { Logger } from './lib/logger.js';
@@ -31,6 +32,7 @@ import type {
   AuthChallengesRepo,
   CustomersRepo,
   KycRecordsRepo,
+  PhoneChangesRepo,
   PhoneTokensRepo,
   SessionsRepo,
   StepUpTokensRepo,
@@ -43,6 +45,7 @@ import type { JwtSigner } from './services/jwtSigner.js';
 import type { PhoneTokenSigner } from './services/phoneTokenSigner.js';
 import type { IprsService } from './services/iprsService.js';
 import type { KycHasher } from './services/kycHash.js';
+import type { StepupVerifier } from './services/stepupVerifier.js';
 
 export interface AppDeps {
   env: Env;
@@ -54,6 +57,7 @@ export interface AppDeps {
   stepUpTokensRepo: StepUpTokensRepo;
   phoneTokensRepo: PhoneTokensRepo;
   kycRecordsRepo: KycRecordsRepo;
+  phoneChangesRepo: PhoneChangesRepo;
   phoneCrypto: PhoneCrypto;
   eventProducer: EventProducer;
   auditLogger: AuditLogger;
@@ -62,6 +66,7 @@ export interface AppDeps {
   phoneTokenSigner: PhoneTokenSigner;
   iprsService: IprsService;
   kycHasher: KycHasher;
+  stepupVerifier: StepupVerifier;
   logger: Logger;
 }
 
@@ -146,6 +151,18 @@ export async function buildApp(deps: AppDeps) {
       kycHasher: deps.kycHasher,
       eventProducer: deps.eventProducer,
       auditLogger: deps.auditLogger,
+    })
+  );
+  await app.register(
+    phoneChangeRoutes({
+      customersRepo: deps.customersRepo,
+      challengesRepo: deps.challengesRepo,
+      phoneChangesRepo: deps.phoneChangesRepo,
+      phoneCrypto: deps.phoneCrypto,
+      eventProducer: deps.eventProducer,
+      auditLogger: deps.auditLogger,
+      stepupVerifier: deps.stepupVerifier,
+      otpBcryptRounds: deps.env.OTP_BCRYPT_ROUNDS,
     })
   );
   await app.register(tierRoutes({ customersRepo: deps.customersRepo }));

@@ -12,11 +12,13 @@ import { createMemorySessionsRepo } from '../src/repositories/sessions.memory.js
 import { createMemoryStepUpTokensRepo } from '../src/repositories/stepUpTokens.memory.js';
 import { createMemoryPhoneTokensRepo } from '../src/repositories/phoneTokens.memory.js';
 import { createMemoryKycRecordsRepo } from '../src/repositories/kycRecords.memory.js';
+import { createMemoryPhoneChangesRepo } from '../src/repositories/phoneChanges.memory.js';
 import { loadOrGenerateKeys } from '../src/services/jwtKeys.js';
 import { createJwtSigner } from '../src/services/jwtSigner.js';
 import { createPhoneTokenSigner } from '../src/services/phoneTokenSigner.js';
 import { createStubIprsService } from '../src/services/iprsService.js';
 import { createKycHasher } from '../src/services/kycHash.js';
+import { createStepupVerifier } from '../src/services/stepupVerifier.js';
 
 export const TEST_APP_ID = 'identiti_test_app';
 export const TEST_HMAC_SECRET = 'test-hmac-secret-32-bytes-of-rand';
@@ -115,6 +117,7 @@ export interface TestDepsBundle extends AppDeps {
   stepUpTokensRepo: ReturnType<typeof createMemoryStepUpTokensRepo>;
   phoneTokensRepo: ReturnType<typeof createMemoryPhoneTokensRepo>;
   kycRecordsRepo: ReturnType<typeof createMemoryKycRecordsRepo>;
+  phoneChangesRepo: ReturnType<typeof createMemoryPhoneChangesRepo>;
   iprsService: ReturnType<typeof createStubIprsService>;
 }
 
@@ -135,6 +138,12 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
   });
   const iprsService = createStubIprsService();
   const kycHasher = createKycHasher(TEST_KYC_HASH_SALT);
+  const stepUpTokensRepo = createMemoryStepUpTokensRepo();
+  const stepupVerifier = createStepupVerifier({
+    jwtKeys: [jwtKeyPair],
+    stepUpTokensRepo,
+    issuer: 'https://api.id.identiti.co.ke',
+  });
 
   return {
     env: {
@@ -164,9 +173,10 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
     customersRepo: createMemoryCustomersRepo(),
     challengesRepo: createMemoryAuthChallengesRepo(),
     sessionsRepo: createMemorySessionsRepo(),
-    stepUpTokensRepo: createMemoryStepUpTokensRepo(),
+    stepUpTokensRepo,
     phoneTokensRepo: createMemoryPhoneTokensRepo(),
     kycRecordsRepo: createMemoryKycRecordsRepo(),
+    phoneChangesRepo: createMemoryPhoneChangesRepo(),
     phoneCrypto: createPhoneCrypto({
       encryptionKeyHex: TEST_PHONE_ENCRYPTION_KEY,
       hashSaltHex: TEST_PHONE_HASH_SALT,
@@ -178,6 +188,7 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
     phoneTokenSigner,
     iprsService,
     kycHasher,
+    stepupVerifier,
     logger,
   };
 }

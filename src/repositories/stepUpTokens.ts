@@ -4,7 +4,7 @@
 
 import type { Db } from '../db/client.js';
 import { stepUpTokens } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type {
   ActorType,
   InitiatedBy,
@@ -32,6 +32,14 @@ export function createPgStepUpTokensRepo(db: Db): StepUpTokensRepo {
         iat: input.iat,
         exp: input.exp,
       });
+    },
+    async markConsumed(jti, consumedAt) {
+      const result = await db
+        .update(stepUpTokens)
+        .set({ consumedAt })
+        .where(and(eq(stepUpTokens.jti, jti), isNull(stepUpTokens.consumedAt)))
+        .returning({ jti: stepUpTokens.jti });
+      return result.length > 0;
     },
     async findByJti(jti) {
       const rows = await db
