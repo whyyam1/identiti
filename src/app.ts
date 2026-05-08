@@ -181,6 +181,7 @@ export async function buildApp(deps: AppDeps) {
   await app.register(
     operatorRoutes({
       customersRepo: deps.customersRepo,
+      kycRecordsRepo: deps.kycRecordsRepo,
       eventProducer: deps.eventProducer,
       auditLogger: deps.auditLogger,
     })

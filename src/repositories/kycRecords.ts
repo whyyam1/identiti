@@ -2,7 +2,7 @@
  * Postgres-backed KycRecordsRepo.
  */
 
-import { and, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { kycRecords } from '../db/schema.js';
 import type {
@@ -96,6 +96,16 @@ export function createPgKycRecordsRepo(db: Db): KycRecordsRepo {
         .where(eq(kycRecords.accountId, accountId));
       return rows.map(rowToRecord);
     },
+    async listByStatus(status, limit) {
+      const cap = limit ?? 100;
+      const rows = await db
+        .select()
+        .from(kycRecords)
+        .where(eq(kycRecords.status, status))
+        .orderBy(desc(kycRecords.createdAt))
+        .limit(cap);
+      return rows.map(rowToRecord);
+    },
     async isNationalIdHashClaimedByOther(nationalIdHash, excludingAccountId) {
       const rows = await db
         .select({ id: kycRecords.id })
@@ -109,6 +119,31 @@ export function createPgKycRecordsRepo(db: Db): KycRecordsRepo {
         )
         .limit(1);
       return rows.length > 0;
+    },
+    async markVerified(id, opts) {
+      const [row] = await db
+        .update(kycRecords)
+        .set({
+          status: 'verified',
+          verifiedAt: opts.verifiedAt,
+          expiresAt: opts.expiresAt,
+          updatedAt: sql`NOW()`,
+        })
+        .where(and(eq(kycRecords.id, id), eq(kycRecords.status, 'pending')))
+        .returning();
+      return row ? rowToRecord(row) : null;
+    },
+    async markFailed(id, reason) {
+      const [row] = await db
+        .update(kycRecords)
+        .set({
+          status: 'failed',
+          failureReason: reason,
+          updatedAt: sql`NOW()`,
+        })
+        .where(and(eq(kycRecords.id, id), eq(kycRecords.status, 'pending')))
+        .returning();
+      return row ? rowToRecord(row) : null;
     },
   };
 }

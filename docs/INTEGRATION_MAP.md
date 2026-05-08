@@ -209,6 +209,32 @@ This section captures the v1.0 integration responses to the agentic AI threat la
 | **`actor` claim on step-up JWT** — distinguishes subject (delegating user) from actor (executing entity, human or agent); implements emerging CSA / IMDA / OAuth 2.1 standard | Identiti Schema Appendix Amendment §A.1 | ID-4 part 1 |
 | **`initiated_by` claim on step-up JWT** — names originating intent class (human / agent / system); enables cross-rail audit reconstruction | Identiti Schema Appendix Amendment §A.2 | KP-5, XR-1 |
 
+### 11.2.1 JIT identity posture — Identiti's canonical position
+
+Identiti's token model is canonically a **just-in-time identity model**. Every credential Identiti mints expires fast and is bound to the operation it was issued for. Concretely, as of v1.0:
+
+| Credential | TTL | Refresh | Bound to |
+|---|---|---|---|
+| Customer token (standard scopes) | 30 min | No silent refresh; re-auth required | `aud` = consuming app + Identiti |
+| Customer token (elevated scopes) | **5 min** | No refresh on elevated scopes; step-up + re-auth required | per Schema Appendix Amendment §A.4 |
+| Service token (standard scopes) | 15 min | Service refresh acceptable | per `app_credentials` |
+| Service token (elevated scopes — `identiti:admin`, `identiti:stepup:verify`) | **5 min** | No refresh | per Amendment §A.4 |
+| Step-up token | **5 min** | Single-use (jti consumed) | `aud` + `sub` + `operation_kind` (Schema Appendix §16.2) |
+| Phone token | 15 min | Single-use per resolve call | `aud='todoku'` + `sub` (INTEGRATION_MAP §7.2) |
+
+Architectural implications:
+
+- **No long-lived bearer tokens.** The longest-lived Identiti-issued credential is a 30-minute standard customer session — and even that re-authenticates fresh on session expiry rather than refreshing silently in the background.
+- **No static service accounts.** Every service-side identity refreshes on a 5–15 minute cycle.
+- **No refresh on elevated scopes.** Elevation requires explicit re-authentication, with step-up where the operation risk warrants.
+- **No credential outlives its purpose.** Step-up tokens expire 5 minutes after issuance; phone tokens expire 15 minutes after issuance; both are single-use at consumption.
+
+This posture is the architecturally correct response to the threat landscape that emerged in late 2025: AiTM session-token theft was the primary MFA-bypass vector (80% of MFA breaches per Microsoft Digital Defense Report 2025), and short TTLs on elevated scopes constrain the replay window even when the rest of the AiTM chain succeeds.
+
+It is also the defensibility position for Identiti as an externalised OAuth issuer: the JIT posture aligns with CSA Agentic AI Addendum (Oct 2025), the IMDA Model Governance Framework (Jan 2026), and the OAuth 2.1 / MCP direction-of-travel.
+
+Authoritative spec: Identiti Schema Appendix Amendment §A.5 (JIT posture) + §A.4 (TTL policy table).
+
 ### 11.3 v1.1 roadmap items
 
 | Item | Where | Scan item |

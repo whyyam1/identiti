@@ -29,8 +29,38 @@ export interface AuditEntry {
   detail?: Record<string, unknown>;
 }
 
+export interface AuditEntryRead extends AuditEntry {
+  id: string;
+  createdAt: Date;
+  previousHash: string | null;
+  entryHash: string;
+}
+
+export interface AuditListOptions {
+  /** Hard cap. Defaults to 100; clamped to 500 (operator console pulls full pages on demand). */
+  limit?: number;
+}
+
 export interface AuditLogger {
   append(entry: AuditEntry): Promise<void>;
+  /**
+   * Read entries for a (resourceType, resourceId) pair, newest first. v1.0
+   * limit-only — cursor pagination is a v1.1 polish if console UX needs it.
+   */
+  listByResource(
+    resourceType: string,
+    resourceId: string,
+    opts?: AuditListOptions
+  ): Promise<AuditEntryRead[]>;
+}
+
+const DEFAULT_LIST_LIMIT = 100;
+const MAX_LIST_LIMIT = 500;
+
+export function clampListLimit(requested: number | undefined): number {
+  if (requested === undefined) return DEFAULT_LIST_LIMIT;
+  if (!Number.isFinite(requested) || requested <= 0) return DEFAULT_LIST_LIMIT;
+  return Math.min(MAX_LIST_LIMIT, Math.max(1, Math.floor(requested)));
 }
 
 const ADVISORY_LOCK_KEY = 73210123;
@@ -58,6 +88,37 @@ function computeEntryHash(input: {
 
 export function createDbAuditLogger(db: Db): AuditLogger {
   return {
+    async listByResource(resourceType, resourceId, opts) {
+      const limit = clampListLimit(opts?.limit);
+      const rows = await db
+        .select()
+        .from(auditLog)
+        .where(
+          sql`${auditLog.resourceType} = ${resourceType} AND ${auditLog.resourceId} = ${resourceId}`
+        )
+        .orderBy(sql`${auditLog.createdAt} DESC`)
+        .limit(limit);
+      return rows.map((r) => {
+        const entry: AuditEntryRead = {
+          id: r.id,
+          appId: r.appId,
+          actorType: r.actorType as 'app' | 'operator' | 'system',
+          actorId: r.actorId,
+          action: r.action,
+          requestId: r.requestId,
+          outcome: r.outcome as 'success' | 'failure',
+          previousHash: r.previousHash,
+          entryHash: r.entryHash,
+          createdAt: r.createdAt,
+        };
+        if (r.resourceType !== null) entry.resourceType = r.resourceType;
+        if (r.resourceId !== null) entry.resourceId = r.resourceId;
+        if (r.traceparent !== null) entry.traceparent = r.traceparent;
+        if (r.ipAddress !== null) entry.ipAddress = r.ipAddress;
+        if (r.detail !== null) entry.detail = r.detail as Record<string, unknown>;
+        return entry;
+      });
+    },
     async append(entry) {
       await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(${ADVISORY_LOCK_KEY})`);
@@ -104,5 +165,26 @@ export class InMemoryAuditLogger implements AuditLogger {
 
   async append(entry: AuditEntry): Promise<void> {
     this.entries.push({ ...entry });
+  }
+
+  async listByResource(
+    resourceType: string,
+    resourceId: string,
+    opts?: AuditListOptions
+  ): Promise<AuditEntryRead[]> {
+    const limit = clampListLimit(opts?.limit);
+    // Newest-first projection. Tests don't need stable IDs / hash chains, so
+    // synthesise placeholders on read.
+    const matched = this.entries
+      .filter((e) => e.resourceType === resourceType && e.resourceId === resourceId)
+      .reverse()
+      .slice(0, limit);
+    return matched.map((e, idx) => ({
+      ...e,
+      id: `mem_${idx}`,
+      createdAt: new Date(),
+      previousHash: null,
+      entryHash: `mem_hash_${idx}`,
+    }));
   }
 }

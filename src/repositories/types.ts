@@ -324,11 +324,17 @@ export interface KycRecordsRepo {
   create(input: KycRecordInsert): Promise<KycRecord>;
   findById(id: string): Promise<KycRecord | null>;
   listByAccount(accountId: string): Promise<KycRecord[]>;
+  /** Operator console: list records currently in a given state (e.g. 'pending' for review). */
+  listByStatus(status: KycArtefactState, limit?: number): Promise<KycRecord[]>;
   /** Returns true iff some other account already has a verified row for this hash. */
   isNationalIdHashClaimedByOther(
     nationalIdHash: string,
     excludingAccountId: string
   ): Promise<boolean>;
+  /** Operator approve: pending → verified. Returns null if not found or not pending. */
+  markVerified(id: string, opts: { verifiedAt: Date; expiresAt: Date }): Promise<KycRecord | null>;
+  /** Operator reject: pending → failed. Returns null if not found or not pending. */
+  markFailed(id: string, reason: string): Promise<KycRecord | null>;
 }
 
 // ─── PhoneTokensRepo ──────────────────────────────────────────────────────

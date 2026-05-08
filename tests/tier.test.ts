@@ -73,6 +73,78 @@ async function createCustomer(app: App, phone: string): Promise<string> {
   return r.json().data.account_uuid as string;
 }
 
+describe('GET /v1/customers/{uuid}/tier — ID-8 polish', () => {
+  let app: App;
+  let deps: TestDepsBundle;
+
+  beforeEach(async () => {
+    deps = makeTestDeps();
+    app = await buildApp(deps);
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('emits Cache-Control: private, max-age=60 on the tier-signal response', async () => {
+    const account = await createCustomer(app, '+254712410001');
+    const url = `/v1/customers/${account}/tier`;
+    const r = await app.inject({
+      method: 'GET',
+      url,
+      headers: signedHeaders({
+        method: 'GET',
+        url,
+        appId: TEST_OPERATOR_APP_ID,
+        secret: TEST_OPERATOR_HMAC_SECRET,
+      }),
+    });
+    expect(r.statusCode).toBe(200);
+    expect(r.headers['cache-control']).toBe('private, max-age=60');
+  });
+
+  it('omits next_review_at for tier_0 / tier_1 and emits it for tier_2', async () => {
+    const account = await createCustomer(app, '+254712410002');
+    const url = `/v1/customers/${account}/tier`;
+
+    // tier_0 — should NOT carry next_review_at.
+    const r0 = await app.inject({
+      method: 'GET',
+      url,
+      headers: signedHeaders({
+        method: 'GET',
+        url,
+        appId: TEST_OPERATOR_APP_ID,
+        secret: TEST_OPERATOR_HMAC_SECRET,
+      }),
+    });
+    expect(r0.statusCode).toBe(200);
+    expect(r0.json().data.next_review_at).toBeUndefined();
+
+    // Promote to tier_2 directly via the repo.
+    await deps.customersRepo.setTier(account, 'tier_2', 'operator_tier_2_approval');
+    const r2 = await app.inject({
+      method: 'GET',
+      url,
+      headers: signedHeaders({
+        method: 'GET',
+        url,
+        appId: TEST_OPERATOR_APP_ID,
+        secret: TEST_OPERATOR_HMAC_SECRET,
+      }),
+    });
+    expect(r2.statusCode).toBe(200);
+    const env = r2.json();
+    expect(env.data.tier).toBe('tier_2');
+    expect(typeof env.data.next_review_at).toBe('string');
+    // 12 months ahead, within tolerance.
+    const reviewMs = new Date(env.data.next_review_at).getTime();
+    const assignedMs = new Date(env.data.assigned_at).getTime();
+    const expected = 365 * 24 * 60 * 60 * 1000;
+    expect(reviewMs - assignedMs).toBe(expected);
+  });
+});
+
 describe('GET /v1/customers/{uuid}/tier', () => {
   let app: App;
   let deps: TestDepsBundle;

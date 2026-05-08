@@ -42,12 +42,33 @@ const validateChallengeRequest = ajv.compile(createChallengeRequestSchema);
 const validateTokenRequest = ajv.compile(customerTokenRequestSchema);
 
 const PRIMARY_TOKEN_TTL_SECONDS = 1800; // 30 minutes per Schema Appendix §2.6
+/** Schema Appendix Amendment §A.4: elevated scopes get a 5-min TTL (no silent refresh). */
+const ELEVATED_TOKEN_TTL_SECONDS = 300;
 
 const CUSTOMER_PRIMARY_SCOPES = [
   'customer:profile_read',
   'customer:tier_request',
   'customer:stepup',
 ] as const;
+
+/**
+ * Scopes that flip a customer token into the §A.4 "elevated" bucket. v1.0 has
+ * none reachable through /v1/auth/customer-token (Tier 2 reads + payment-write
+ * land in later sprints), so the branch is latent today. The check is wired
+ * so dropping a scope into this list immediately switches that scope's tokens
+ * to a 5-min TTL.
+ */
+const ELEVATED_CUSTOMER_SCOPES: readonly string[] = [
+  // 'customer:tier_2_evidence_view',
+  // 'customer:payment_write',
+];
+
+function isElevatedScopeSet(scopes: readonly string[]): boolean {
+  for (const s of scopes) {
+    if (ELEVATED_CUSTOMER_SCOPES.includes(s)) return true;
+  }
+  return false;
+}
 
 interface ChallengeBody {
   phone: string;
@@ -360,7 +381,10 @@ export function authRoutes(deps: AuthRouteDeps): FastifyPluginAsync {
         // step-up tokens come out of /v1/stepup/verify with their own claim
         // shape per Schema Appendix §16.2.
         const sessionKind = 'primary' as const;
-        const expiresInSeconds = PRIMARY_TOKEN_TTL_SECONDS;
+        // §A.4 TTL policy: 30 min for standard scopes, 5 min for elevated.
+        const expiresInSeconds = isElevatedScopeSet(CUSTOMER_PRIMARY_SCOPES)
+          ? ELEVATED_TOKEN_TTL_SECONDS
+          : PRIMARY_TOKEN_TTL_SECONDS;
 
         // Schema Appendix §2.7: customer-token JWTs carry a `phone_token`
         // claim — an opaque phone token apps pass to Todoku for SMS sends

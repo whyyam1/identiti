@@ -26,3 +26,25 @@ export const operatorActionResponseSchema = {
     changed_at: { type: 'string' },
   },
 } as const;
+
+/** Operator KYC reject body (Phase 9). */
+export const operatorKycRejectRequestSchema = {
+  $id: 'identiti/OperatorKycRejectRequest',
+  type: 'object',
+  required: ['reason'],
+  additionalProperties: false,
+  properties: {
+    reason: { type: 'string', minLength: 1, maxLength: 500 },
+  },
+} as const;
+
+/** Operator KYC approve body (Phase 9). */
+export const operatorKycApproveRequestSchema = {
+  $id: 'identiti/OperatorKycApproveRequest',
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    /** Optional free-text rationale. */
+    narrative: { type: 'string', maxLength: 500 },
+  },
+} as const;

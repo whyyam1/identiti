@@ -49,6 +49,14 @@ export function createMemoryKycRecordsRepo(): KycRecordsRepo & {
         .filter((r) => r.accountId === accountId)
         .map((r) => ({ ...r }));
     },
+    async listByStatus(status, limit) {
+      const cap = limit ?? 100;
+      return Array.from(data.values())
+        .filter((r) => r.status === status)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(0, cap)
+        .map((r) => ({ ...r }));
+    },
     async isNationalIdHashClaimedByOther(nationalIdHash, excludingAccountId) {
       for (const r of data.values()) {
         if (
@@ -60,6 +68,20 @@ export function createMemoryKycRecordsRepo(): KycRecordsRepo & {
         }
       }
       return false;
+    },
+    async markVerified(id, opts) {
+      const r = data.get(id);
+      if (!r || r.status !== 'pending') return null;
+      const updated = { ...r, status: 'verified' as const, verifiedAt: opts.verifiedAt, expiresAt: opts.expiresAt };
+      data.set(id, updated);
+      return { ...updated };
+    },
+    async markFailed(id, reason) {
+      const r = data.get(id);
+      if (!r || r.status !== 'pending') return null;
+      const updated = { ...r, status: 'failed' as const, failureReason: reason };
+      data.set(id, updated);
+      return { ...updated };
     },
     list: () => Array.from(data.values()),
   };
