@@ -192,6 +192,84 @@ export interface StepUpTokensRepo {
   findByJti(jti: string): Promise<StepUpTokenInsert | null>;
 }
 
+// ─── KycRecordsRepo ───────────────────────────────────────────────────────
+// Phase 4. One row per KYC artefact submission. State machine per Schema
+// Appendix §17.2: pending → verified → expired/revoked; pending → failed.
+
+export type KycKind =
+  | 'iprs_lookup'
+  | 'national_id_front'
+  | 'national_id_back'
+  | 'passport_main'
+  | 'passport_signed'
+  | 'selfie_liveness'
+  | 'address_proof_utility'
+  | 'address_proof_bank_statement'
+  | 'address_proof_tenancy'
+  | 'address_proof_government'
+  | 'sanctions_check'
+  | 'pep_check'
+  | 'kmpdc_verification'
+  | 'business_registration';
+
+export type KycArtefactState = 'pending' | 'verified' | 'failed' | 'expired' | 'revoked';
+export type KycVerificationMethod =
+  | 'iprs'
+  | 'manual'
+  | 'document_scan'
+  | 'selfie_liveness'
+  | 'address_proof';
+export type IprsMatch = 'full_match' | 'partial_match' | 'no_match';
+export type IprsConfidenceBand = 'high' | 'medium' | 'low';
+
+export interface KycRecordInsert {
+  id: string;
+  accountId: string;
+  kind: KycKind;
+  tier: 'tier_1' | 'tier_2';
+  verificationMethod: KycVerificationMethod;
+  status: KycArtefactState;
+  nationalIdHash?: string;
+  iprsVerified?: boolean;
+  iprsVerificationRef?: string;
+  iprsMatch?: IprsMatch;
+  iprsConfidenceBand?: IprsConfidenceBand;
+  failureReason?: string;
+  verifiedAt?: Date;
+  expiresAt?: Date;
+}
+
+export interface KycRecord {
+  id: string;
+  accountId: string;
+  kind: KycKind;
+  tier: 'tier_1' | 'tier_2';
+  verificationMethod: KycVerificationMethod;
+  status: KycArtefactState;
+  nationalIdHash: string | null;
+  iprsVerified: boolean;
+  iprsVerificationRef: string | null;
+  iprsMatch: IprsMatch | null;
+  iprsConfidenceBand: IprsConfidenceBand | null;
+  sanctionsChecked: boolean;
+  pepChecked: boolean;
+  failureReason: string | null;
+  verifiedAt: Date | null;
+  expiresAt: Date | null;
+  createdAt: Date;
+}
+
+export interface KycRecordsRepo {
+  create(input: KycRecordInsert): Promise<KycRecord>;
+  findById(id: string): Promise<KycRecord | null>;
+  listByAccount(accountId: string): Promise<KycRecord[]>;
+  /** Returns true iff some other account already has a verified row for this hash. */
+  isNationalIdHashClaimedByOther(
+    nationalIdHash: string,
+    excludingAccountId: string
+  ): Promise<boolean>;
+}
+
 // ─── PhoneTokensRepo ──────────────────────────────────────────────────────
 // Phase 6. Phone tokens are HS256 opaque JWTs; the resolve path is the
 // authoritative verification, not the JWT signature.

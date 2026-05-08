@@ -19,6 +19,7 @@ import { createPgAuthChallengesRepo } from './repositories/authChallenges.js';
 import { createPgSessionsRepo } from './repositories/sessions.js';
 import { createPgStepUpTokensRepo } from './repositories/stepUpTokens.js';
 import { createPgPhoneTokensRepo } from './repositories/phoneTokens.js';
+import { createPgKycRecordsRepo } from './repositories/kycRecords.js';
 import { createDbAuditLogger } from './services/auditLogger.js';
 import {
   InMemoryEventProducer,
@@ -28,6 +29,8 @@ import {
 import { loadOrGenerateKeys } from './services/jwtKeys.js';
 import { createJwtSigner } from './services/jwtSigner.js';
 import { createPhoneTokenSigner } from './services/phoneTokenSigner.js';
+import { createStubIprsService } from './services/iprsService.js';
+import { createKycHasher } from './services/kycHash.js';
 import { buildApp } from './app.js';
 
 async function main(): Promise<void> {
@@ -42,6 +45,21 @@ async function main(): Promise<void> {
   const sessionsRepo = createPgSessionsRepo(db);
   const stepUpTokensRepo = createPgStepUpTokensRepo(db);
   const phoneTokensRepo = createPgPhoneTokensRepo(db);
+  const kycRecordsRepo = createPgKycRecordsRepo(db);
+  const kycHasher = createKycHasher(env.KYC_HASH_SALT);
+
+  // IPRS Track A access not provisioned at v1.0 build time. The stub is the
+  // only impl shipped today; production must wire a real IprsService when
+  // Reboot Pack §7 ID-D-06 closes.
+  if (!env.IPRS_STUB_MODE && env.NODE_ENV === 'production') {
+    throw new Error(
+      'IPRS_STUB_MODE=false in production but no real IPRS adapter is wired (Reboot Pack §7 ID-D-06)'
+    );
+  }
+  const iprsService = createStubIprsService();
+  if (env.IPRS_STUB_MODE) {
+    logger.warn('IPRS_STUB_MODE=true — using deterministic IPRS stub. Track A access pending.');
+  }
   const phoneCrypto = createPhoneCrypto({
     encryptionKeyHex: env.PHONE_ENCRYPTION_KEY,
     hashSaltHex: env.PHONE_HASH_SALT,
@@ -91,12 +109,15 @@ async function main(): Promise<void> {
     sessionsRepo,
     stepUpTokensRepo,
     phoneTokensRepo,
+    kycRecordsRepo,
     phoneCrypto,
     eventProducer,
     auditLogger,
     jwtKeys: [jwtKeyPair],
     jwtSigner,
     phoneTokenSigner,
+    iprsService,
+    kycHasher,
     logger,
   });
 

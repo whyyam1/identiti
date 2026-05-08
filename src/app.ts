@@ -24,11 +24,13 @@ import { authRoutes } from './routes/auth.js';
 import { tierRoutes } from './routes/tier.js';
 import { stepupRoutes } from './routes/stepup.js';
 import { phoneTokensRoutes } from './routes/phoneTokens.js';
+import { kycRoutes } from './routes/kyc.js';
 import type { Env } from './config/env.js';
 import type { Logger } from './lib/logger.js';
 import type {
   AuthChallengesRepo,
   CustomersRepo,
+  KycRecordsRepo,
   PhoneTokensRepo,
   SessionsRepo,
   StepUpTokensRepo,
@@ -39,6 +41,8 @@ import type { AuditLogger } from './services/auditLogger.js';
 import type { JwtKeyPair } from './services/jwtKeys.js';
 import type { JwtSigner } from './services/jwtSigner.js';
 import type { PhoneTokenSigner } from './services/phoneTokenSigner.js';
+import type { IprsService } from './services/iprsService.js';
+import type { KycHasher } from './services/kycHash.js';
 
 export interface AppDeps {
   env: Env;
@@ -49,12 +53,15 @@ export interface AppDeps {
   sessionsRepo: SessionsRepo;
   stepUpTokensRepo: StepUpTokensRepo;
   phoneTokensRepo: PhoneTokensRepo;
+  kycRecordsRepo: KycRecordsRepo;
   phoneCrypto: PhoneCrypto;
   eventProducer: EventProducer;
   auditLogger: AuditLogger;
   jwtKeys: readonly JwtKeyPair[];
   jwtSigner: JwtSigner;
   phoneTokenSigner: PhoneTokenSigner;
+  iprsService: IprsService;
+  kycHasher: KycHasher;
   logger: Logger;
 }
 
@@ -128,6 +135,16 @@ export async function buildApp(deps: AppDeps) {
       customersRepo: deps.customersRepo,
       phoneTokensRepo: deps.phoneTokensRepo,
       phoneTokenSigner: deps.phoneTokenSigner,
+      auditLogger: deps.auditLogger,
+    })
+  );
+  await app.register(
+    kycRoutes({
+      customersRepo: deps.customersRepo,
+      kycRecordsRepo: deps.kycRecordsRepo,
+      iprsService: deps.iprsService,
+      kycHasher: deps.kycHasher,
+      eventProducer: deps.eventProducer,
       auditLogger: deps.auditLogger,
     })
   );

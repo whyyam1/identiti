@@ -40,6 +40,10 @@ export interface Env {
   OTP_BCRYPT_ROUNDS: number;
   /** HS256 key for phone-token signing. 64 hex chars (32 bytes). */
   PHONE_TOKEN_SIGNING_KEY: string;
+  /** PBKDF2 salt for hashing national IDs. 64 hex chars recommended. */
+  KYC_HASH_SALT: string;
+  /** When true, IPRS lookups go to the deterministic stub instead of the real upstream. */
+  IPRS_STUB_MODE: boolean;
 }
 
 function required(name: string): string {
@@ -147,6 +151,8 @@ export function loadEnv(): Env {
     JWT_ISSUER: optional('JWT_ISSUER', 'https://api.id.identiti.co.ke'),
     OTP_BCRYPT_ROUNDS: asInt('OTP_BCRYPT_ROUNDS', optional('OTP_BCRYPT_ROUNDS', '10')),
     PHONE_TOKEN_SIGNING_KEY: required('PHONE_TOKEN_SIGNING_KEY'),
+    KYC_HASH_SALT: required('KYC_HASH_SALT'),
+    IPRS_STUB_MODE: asBool('IPRS_STUB_MODE', optional('IPRS_STUB_MODE', 'true')),
   };
 }
 

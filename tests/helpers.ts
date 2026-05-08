@@ -11,9 +11,12 @@ import { createMemoryAuthChallengesRepo } from '../src/repositories/authChalleng
 import { createMemorySessionsRepo } from '../src/repositories/sessions.memory.js';
 import { createMemoryStepUpTokensRepo } from '../src/repositories/stepUpTokens.memory.js';
 import { createMemoryPhoneTokensRepo } from '../src/repositories/phoneTokens.memory.js';
+import { createMemoryKycRecordsRepo } from '../src/repositories/kycRecords.memory.js';
 import { loadOrGenerateKeys } from '../src/services/jwtKeys.js';
 import { createJwtSigner } from '../src/services/jwtSigner.js';
 import { createPhoneTokenSigner } from '../src/services/phoneTokenSigner.js';
+import { createStubIprsService } from '../src/services/iprsService.js';
+import { createKycHasher } from '../src/services/kycHash.js';
 
 export const TEST_APP_ID = 'identiti_test_app';
 export const TEST_HMAC_SECRET = 'test-hmac-secret-32-bytes-of-rand';
@@ -24,6 +27,7 @@ export const TEST_TODOKU_HMAC_SECRET = 'todoku-test-secret-32-bytes_abcde';
 
 const TEST_PHONE_ENCRYPTION_KEY = randomBytes(32).toString('hex');
 const TEST_PHONE_HASH_SALT = randomBytes(32).toString('hex');
+const TEST_KYC_HASH_SALT = randomBytes(32).toString('hex');
 
 // Generate a single RSA keypair at module load and share it across every
 // test. RSA-2048 generation is ~150-300 ms on modern hardware, far too slow
@@ -110,6 +114,8 @@ export interface TestDepsBundle extends AppDeps {
   auditLogger: InMemoryAuditLogger;
   stepUpTokensRepo: ReturnType<typeof createMemoryStepUpTokensRepo>;
   phoneTokensRepo: ReturnType<typeof createMemoryPhoneTokensRepo>;
+  kycRecordsRepo: ReturnType<typeof createMemoryKycRecordsRepo>;
+  iprsService: ReturnType<typeof createStubIprsService>;
 }
 
 export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle {
@@ -127,6 +133,8 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
     signingKey: phoneTokenSigningKey,
     issuer: 'https://api.id.identiti.co.ke',
   });
+  const iprsService = createStubIprsService();
+  const kycHasher = createKycHasher(TEST_KYC_HASH_SALT);
 
   return {
     env: {
@@ -148,6 +156,8 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
       JWT_ISSUER: 'https://api.id.identiti.co.ke',
       OTP_BCRYPT_ROUNDS: 4, // fast in tests
       PHONE_TOKEN_SIGNING_KEY: phoneTokenSigningKey.toString('hex'),
+      KYC_HASH_SALT: TEST_KYC_HASH_SALT,
+      IPRS_STUB_MODE: true,
     },
     credentialStore: overrides.credentialStore ?? makeMemCredStore(),
     idempotencyStore: overrides.idempotencyStore ?? makeMemIdempotencyStore(),
@@ -156,6 +166,7 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
     sessionsRepo: createMemorySessionsRepo(),
     stepUpTokensRepo: createMemoryStepUpTokensRepo(),
     phoneTokensRepo: createMemoryPhoneTokensRepo(),
+    kycRecordsRepo: createMemoryKycRecordsRepo(),
     phoneCrypto: createPhoneCrypto({
       encryptionKeyHex: TEST_PHONE_ENCRYPTION_KEY,
       hashSaltHex: TEST_PHONE_HASH_SALT,
@@ -165,6 +176,8 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
     jwtKeys: [jwtKeyPair],
     jwtSigner,
     phoneTokenSigner,
+    iprsService,
+    kycHasher,
     logger,
   };
 }

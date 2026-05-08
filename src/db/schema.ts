@@ -3,6 +3,7 @@
  * Phase 1 (foundation): app_credentials, idempotency_keys, audit_log.
  * Phase 2 (Sprint 1):    platform_accounts, phone_records.
  * Phase 3 (Sprint 2):    auth_challenges, sessions.
+ * Phase 4 (Sprint 6):    kyc_records.
  * Phase 5 (Sprint 4):    step_up_tokens (with Amendment §A.1 columns).
  * Phase 6 (Sprint 5):    phone_tokens.
  *
@@ -177,6 +178,41 @@ export const sessions = pgTable(
   (t) => ({
     accountIdx: index('sessions_account_idx').on(t.accountId, t.expiresAt),
     jtiIdx: index('sessions_jti_idx').on(t.jti),
+  })
+);
+
+// ─── Sprint 6 (Phase 4) — KYC artefacts ───────────────────────────────────
+
+export const kycRecords = pgTable(
+  'kyc_records',
+  {
+    id: text('id').primaryKey(),
+    accountId: text('account_id').notNull(),
+    kind: text('kind').notNull(),
+    tier: text('tier').notNull(),
+    verificationMethod: text('verification_method').notNull(),
+    status: text('status').notNull().default('pending'),
+    nationalIdHash: text('national_id_hash'),
+    iprsVerified: boolean('iprs_verified').notNull().default(false),
+    iprsVerificationRef: text('iprs_verification_ref'),
+    iprsMatch: text('iprs_match'),
+    iprsConfidenceBand: text('iprs_confidence_band'),
+    sanctionsChecked: boolean('sanctions_checked').notNull().default(false),
+    sanctionsCheckRef: text('sanctions_check_ref'),
+    pepChecked: boolean('pep_checked').notNull().default(false),
+    pepCheckRef: text('pep_check_ref'),
+    failureReason: text('failure_reason'),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    accountKindStatusIdx: index('kyc_records_account_kind_status_idx').on(
+      t.accountId,
+      t.kind,
+      t.status
+    ),
   })
 );
 
