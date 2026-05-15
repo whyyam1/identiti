@@ -13,12 +13,14 @@ import { createMemoryStepUpTokensRepo } from '../src/repositories/stepUpTokens.m
 import { createMemoryPhoneTokensRepo } from '../src/repositories/phoneTokens.memory.js';
 import { createMemoryKycRecordsRepo } from '../src/repositories/kycRecords.memory.js';
 import { createMemoryPhoneChangesRepo } from '../src/repositories/phoneChanges.memory.js';
+import { createMemoryDelegatedAuthoritySigningsRepo } from '../src/repositories/delegatedAuthoritySignings.memory.js';
 import { loadOrGenerateKeys } from '../src/services/jwtKeys.js';
 import { createJwtSigner } from '../src/services/jwtSigner.js';
 import { createPhoneTokenSigner } from '../src/services/phoneTokenSigner.js';
 import { createStubIprsService } from '../src/services/iprsService.js';
 import { createKycHasher } from '../src/services/kycHash.js';
 import { createStepupVerifier } from '../src/services/stepupVerifier.js';
+import { createDelegatedAuthoritySigner } from '../src/services/delegatedAuthoritySigner.js';
 
 export const TEST_APP_ID = 'identiti_test_app';
 export const TEST_HMAC_SECRET = 'test-hmac-secret-32-bytes-of-rand';
@@ -26,18 +28,30 @@ export const TEST_OPERATOR_APP_ID = 'identiti_test_operator';
 export const TEST_OPERATOR_HMAC_SECRET = 'operator-test-secret-32-bytes_xyz';
 export const TEST_TODOKU_APP_ID = 'identiti_test_todoku';
 export const TEST_TODOKU_HMAC_SECRET = 'todoku-test-secret-32-bytes_abcde';
+export const TEST_HELPAN_AI_APP_ID = 'helpan_ai_internal';
+export const TEST_HELPAN_AI_HMAC_SECRET = 'helpan-ai-test-secret-32-bytes_qa';
 
 const TEST_PHONE_ENCRYPTION_KEY = randomBytes(32).toString('hex');
 const TEST_PHONE_HASH_SALT = randomBytes(32).toString('hex');
 const TEST_KYC_HASH_SALT = randomBytes(32).toString('hex');
 
-// Generate a single RSA keypair at module load and share it across every
-// test. RSA-2048 generation is ~150-300 ms on modern hardware, far too slow
-// to do per buildApp call.
+// Generate RSA keypairs at module load and share them across every test.
+// RSA-2048 generation is ~150-300 ms on modern hardware, far too slow to do
+// per buildApp call. Two pairs: one for step-up (Phase 5), one for
+// delegated-authority signing (ID-10). Both are published in JWKS.
 const SHARED_TEST_KEY_PAIR = loadOrGenerateKeys({
+  keyClass: 'step_up',
   ephemeralAllowed: true,
   logger: pino({ level: 'silent' }),
 });
+const SHARED_TEST_DA_KEY_PAIR = loadOrGenerateKeys({
+  keyClass: 'delegated_authority',
+  kidOverride: 'helpan-da-2026-q2-test',
+  ephemeralAllowed: true,
+  logger: pino({ level: 'silent' }),
+});
+
+export { SHARED_TEST_KEY_PAIR, SHARED_TEST_DA_KEY_PAIR };
 
 export function makeMemCredStore(opts: { suspended?: boolean } = {}): AppCredentialStore {
   return {
@@ -87,6 +101,18 @@ export function makeMemCredStore(opts: { suspended?: boolean } = {}): AppCredent
           hmacSecret: TEST_TODOKU_HMAC_SECRET,
         };
       }
+      if (appId === TEST_HELPAN_AI_APP_ID) {
+        return {
+          record: {
+            app_id: TEST_HELPAN_AI_APP_ID,
+            app_name: 'Test Helpan AI rail-internal',
+            tenant_class: 'internal',
+            scopes: ['identiti:internal:sign:delegated_authority'],
+            status: 'active',
+          },
+          hmacSecret: TEST_HELPAN_AI_HMAC_SECRET,
+        };
+      }
       return null;
     },
   };
@@ -118,6 +144,7 @@ export interface TestDepsBundle extends AppDeps {
   phoneTokensRepo: ReturnType<typeof createMemoryPhoneTokensRepo>;
   kycRecordsRepo: ReturnType<typeof createMemoryKycRecordsRepo>;
   phoneChangesRepo: ReturnType<typeof createMemoryPhoneChangesRepo>;
+  delegatedAuthoritySigningsRepo: ReturnType<typeof createMemoryDelegatedAuthoritySigningsRepo>;
   iprsService: ReturnType<typeof createStubIprsService>;
 }
 
@@ -127,6 +154,7 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
   const logger = pino({ level: 'silent' });
 
   const jwtKeyPair = SHARED_TEST_KEY_PAIR;
+  const daKeyPair = SHARED_TEST_DA_KEY_PAIR;
   const jwtSigner = createJwtSigner({
     keyPair: jwtKeyPair,
     issuer: 'https://api.id.identiti.co.ke',
@@ -143,6 +171,11 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
     jwtKeys: [jwtKeyPair],
     stepUpTokensRepo,
     issuer: 'https://api.id.identiti.co.ke',
+  });
+  const delegatedAuthoritySigningsRepo = createMemoryDelegatedAuthoritySigningsRepo();
+  const delegatedAuthoritySigner = createDelegatedAuthoritySigner({
+    daKeys: [daKeyPair],
+    expectedIssuer: 'https://api.id.identiti.co.ke',
   });
 
   return {
@@ -163,6 +196,10 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
       JWT_PRIVATE_KEY_PEM: null,
       JWT_PUBLIC_KEY_PEM: null,
       JWT_ISSUER: 'https://api.id.identiti.co.ke',
+      JWT_DA_PRIVATE_KEY_PEM: null,
+      JWT_DA_PUBLIC_KEY_PEM: null,
+      JWT_DA_KID: 'helpan-da-2026-q2-test',
+      HELPAN_AI_APP_ID: TEST_HELPAN_AI_APP_ID,
       OTP_BCRYPT_ROUNDS: 4, // fast in tests
       PHONE_TOKEN_SIGNING_KEY: phoneTokenSigningKey.toString('hex'),
       KYC_HASH_SALT: TEST_KYC_HASH_SALT,
@@ -177,18 +214,20 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
     phoneTokensRepo: createMemoryPhoneTokensRepo(),
     kycRecordsRepo: createMemoryKycRecordsRepo(),
     phoneChangesRepo: createMemoryPhoneChangesRepo(),
+    delegatedAuthoritySigningsRepo,
     phoneCrypto: createPhoneCrypto({
       encryptionKeyHex: TEST_PHONE_ENCRYPTION_KEY,
       hashSaltHex: TEST_PHONE_HASH_SALT,
     }),
     eventProducer,
     auditLogger,
-    jwtKeys: [jwtKeyPair],
+    jwtKeys: [jwtKeyPair, daKeyPair],
     jwtSigner,
     phoneTokenSigner,
     iprsService,
     kycHasher,
     stepupVerifier,
+    delegatedAuthoritySigner,
     logger,
   };
 }

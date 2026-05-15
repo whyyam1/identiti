@@ -127,6 +127,10 @@ export interface AuthChallengeInsert {
   operationAudience: string | null;
   /** Step-up: drives factor selection + freshness window. NULL for purpose='login'. */
   operationRiskTier: RiskTier | null;
+  /** ID-10: Amendment §A.1 — agentic actor bound at challenge time. NULL for human-initiated. */
+  actor?: StepUpActor;
+  /** ID-10: Amendment §A.2 — originating intent class. */
+  initiatedBy?: InitiatedBy;
 }
 
 export interface AuthChallenge {
@@ -143,6 +147,8 @@ export interface AuthChallenge {
   intendedOperation: string | null;
   operationAudience: string | null;
   operationRiskTier: RiskTier | null;
+  actor: StepUpActor | null;
+  initiatedBy: InitiatedBy | null;
   createdAt: Date;
 }
 
@@ -335,6 +341,44 @@ export interface KycRecordsRepo {
   markVerified(id: string, opts: { verifiedAt: Date; expiresAt: Date }): Promise<KycRecord | null>;
   /** Operator reject: pending → failed. Returns null if not found or not pending. */
   markFailed(id: string, reason: string): Promise<KycRecord | null>;
+}
+
+// ─── DelegatedAuthoritySigningsRepo (ID-10) ───────────────────────────────
+// Helpan AI Delegated Authority Contract §2.5 scope shape; §6.3 signing API;
+// §A.2 cross-rail audit invariant.
+
+export type DelegatedAuthorityPeriod =
+  | 'single_use'
+  | 'daily'
+  | 'weekly'
+  | 'monthly';
+
+export interface DelegatedAuthorityScope {
+  scope_id: string;
+  amount_limit_minor?: number;
+  per_period_limit_minor?: number;
+  period?: DelegatedAuthorityPeriod;
+  category_whitelist?: readonly string[];
+  recipient_whitelist?: readonly string[];
+}
+
+export interface DelegatedAuthoritySigningInsert {
+  jti: string;
+  accountUuid: string;
+  agentId: string;
+  stepUpJti: string | null;
+  scopes: readonly DelegatedAuthorityScope[];
+  kid: string;
+  signedAt: Date;
+  expiresAt: Date;
+  callerAppId: string;
+  traceparent: string | null;
+  businessOpId: string | null;
+}
+
+export interface DelegatedAuthoritySigningsRepo {
+  create(input: DelegatedAuthoritySigningInsert): Promise<void>;
+  findByJti(jti: string): Promise<DelegatedAuthoritySigningInsert | null>;
 }
 
 // ─── PhoneTokensRepo ──────────────────────────────────────────────────────

@@ -37,6 +37,13 @@ export interface Env {
   JWT_PRIVATE_KEY_PEM: string | null;
   JWT_PUBLIC_KEY_PEM: string | null;
   JWT_ISSUER: string;
+  /** ID-10 (Delegated Authority Contract §8.1) — separate signing key for delegated-authority tokens. */
+  JWT_DA_PRIVATE_KEY_PEM: string | null;
+  JWT_DA_PUBLIC_KEY_PEM: string | null;
+  /** ID-10 — literal kid for the DA key, e.g. `helpan-da-2026-q2`. Falls back to an ephemeral kid in dev/test. */
+  JWT_DA_KID: string | null;
+  /** ID-10 — Helpan AI's HMAC tenant app_id; restricts who can call POST /v1/internal/sign. */
+  HELPAN_AI_APP_ID: string;
   OTP_BCRYPT_ROUNDS: number;
   /** HS256 key for phone-token signing. 64 hex chars (32 bytes). */
   PHONE_TOKEN_SIGNING_KEY: string;
@@ -149,6 +156,10 @@ export function loadEnv(): Env {
     JWT_PRIVATE_KEY_PEM: loadJwtPem('JWT_PRIVATE_KEY_PEM', NODE_ENV),
     JWT_PUBLIC_KEY_PEM: loadJwtPem('JWT_PUBLIC_KEY_PEM', NODE_ENV),
     JWT_ISSUER: optional('JWT_ISSUER', 'https://api.id.identiti.co.ke'),
+    JWT_DA_PRIVATE_KEY_PEM: loadJwtPem('JWT_DA_PRIVATE_KEY_PEM', NODE_ENV),
+    JWT_DA_PUBLIC_KEY_PEM: loadJwtPem('JWT_DA_PUBLIC_KEY_PEM', NODE_ENV),
+    JWT_DA_KID: optional('JWT_DA_KID', '') || null,
+    HELPAN_AI_APP_ID: optional('HELPAN_AI_APP_ID', 'helpan_ai_internal'),
     OTP_BCRYPT_ROUNDS: asInt('OTP_BCRYPT_ROUNDS', optional('OTP_BCRYPT_ROUNDS', '10')),
     PHONE_TOKEN_SIGNING_KEY: required('PHONE_TOKEN_SIGNING_KEY'),
     KYC_HASH_SALT: required('KYC_HASH_SALT'),

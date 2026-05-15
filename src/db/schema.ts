@@ -152,6 +152,14 @@ export const authChallenges = pgTable(
     // against. NULL for purpose='login'.
     operationAudience: text('operation_audience'),
     operationRiskTier: text('operation_risk_tier'),
+    // ID-10: Amendment §A.1/§A.2 propagation. Survives the async gap from
+    // /v1/stepup/challenges to /v1/stepup/verify so the resulting step-up
+    // JWT carries the same `actor` + `initiated_by` the caller bound at
+    // challenge time. step_up_tokens carries the eventual durable copy.
+    actorType: text('actor_type'),
+    actorAgentId: text('actor_agent_id'),
+    actorDelegatedAuthorityJti: text('actor_delegated_authority_jti'),
+    initiatedBy: text('initiated_by'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -268,6 +276,34 @@ export const stepUpTokens = pgTable(
     delegatedAuthorityIdx: index('step_up_tokens_delegated_authority_idx').on(
       t.delegatedAuthorityJti
     ),
+  })
+);
+
+// ─── ID-10 — delegated-authority signing ledger ───────────────────────────
+
+export const delegatedAuthoritySignings = pgTable(
+  'delegated_authority_signings',
+  {
+    jti: text('jti').primaryKey(),
+    accountUuid: text('account_uuid').notNull(),
+    agentId: text('agent_id').notNull(),
+    stepUpJti: text('step_up_jti'),
+    scopes: jsonb('scopes').notNull(),
+    kid: text('kid').notNull(),
+    signedAt: timestamp('signed_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    callerAppId: text('caller_app_id').notNull(),
+    traceparent: text('traceparent'),
+    businessOpId: text('business_op_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    accountSignedIdx: index('delegated_authority_signings_account_signed_idx').on(
+      t.accountUuid,
+      t.signedAt
+    ),
+    stepUpIdx: index('delegated_authority_signings_step_up_idx').on(t.stepUpJti),
+    agentIdx: index('delegated_authority_signings_agent_idx').on(t.agentId),
   })
 );
 

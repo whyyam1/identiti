@@ -6,11 +6,13 @@ import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { authChallenges } from '../db/schema.js';
 import type {
+  ActorType,
   AuthChallenge,
   AuthChallengesRepo,
   ChallengePurpose,
   ChallengeStatus,
   Factor,
+  InitiatedBy,
 } from './types.js';
 
 function rowToChallenge(r: {
@@ -27,6 +29,10 @@ function rowToChallenge(r: {
   intendedOperation: string | null;
   operationAudience: string | null;
   operationRiskTier: string | null;
+  actorType: string | null;
+  actorAgentId: string | null;
+  actorDelegatedAuthorityJti: string | null;
+  initiatedBy: string | null;
   createdAt: Date;
 }): AuthChallenge {
   return {
@@ -43,6 +49,16 @@ function rowToChallenge(r: {
     intendedOperation: r.intendedOperation,
     operationAudience: r.operationAudience,
     operationRiskTier: r.operationRiskTier as AuthChallenge['operationRiskTier'],
+    actor: r.actorType
+      ? {
+          type: r.actorType as ActorType,
+          ...(r.actorAgentId ? { agentId: r.actorAgentId } : {}),
+          ...(r.actorDelegatedAuthorityJti
+            ? { delegatedAuthorityJti: r.actorDelegatedAuthorityJti }
+            : {}),
+        }
+      : null,
+    initiatedBy: (r.initiatedBy as InitiatedBy | null) ?? null,
     createdAt: r.createdAt,
   };
 }
@@ -63,6 +79,10 @@ export function createPgAuthChallengesRepo(db: Db): AuthChallengesRepo {
           intendedOperation: input.intendedOperation,
           operationAudience: input.operationAudience,
           operationRiskTier: input.operationRiskTier,
+          actorType: input.actor?.type ?? null,
+          actorAgentId: input.actor?.agentId ?? null,
+          actorDelegatedAuthorityJti: input.actor?.delegatedAuthorityJti ?? null,
+          initiatedBy: input.initiatedBy ?? null,
         })
         .returning();
       if (!row) throw new Error('auth_challenges insert returned no row');

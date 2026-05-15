@@ -21,6 +21,7 @@ import { createPgStepUpTokensRepo } from './repositories/stepUpTokens.js';
 import { createPgPhoneTokensRepo } from './repositories/phoneTokens.js';
 import { createPgKycRecordsRepo } from './repositories/kycRecords.js';
 import { createPgPhoneChangesRepo } from './repositories/phoneChanges.js';
+import { createPgDelegatedAuthoritySigningsRepo } from './repositories/delegatedAuthoritySignings.js';
 import { createDbAuditLogger } from './services/auditLogger.js';
 import {
   InMemoryEventProducer,
@@ -33,6 +34,7 @@ import { createPhoneTokenSigner } from './services/phoneTokenSigner.js';
 import { createStubIprsService } from './services/iprsService.js';
 import { createKycHasher } from './services/kycHash.js';
 import { createStepupVerifier } from './services/stepupVerifier.js';
+import { createDelegatedAuthoritySigner } from './services/delegatedAuthoritySigner.js';
 import { buildApp } from './app.js';
 
 async function main(): Promise<void> {
@@ -49,6 +51,7 @@ async function main(): Promise<void> {
   const phoneTokensRepo = createPgPhoneTokensRepo(db);
   const kycRecordsRepo = createPgKycRecordsRepo(db);
   const phoneChangesRepo = createPgPhoneChangesRepo(db);
+  const delegatedAuthoritySigningsRepo = createPgDelegatedAuthoritySigningsRepo(db);
   const kycHasher = createKycHasher(env.KYC_HASH_SALT);
 
   // IPRS Track A access not provisioned at v1.0 build time. The stub is the
@@ -72,10 +75,28 @@ async function main(): Promise<void> {
   const jwtKeyPair = loadOrGenerateKeys({
     privatePem: env.JWT_PRIVATE_KEY_PEM ?? undefined,
     publicPem: env.JWT_PUBLIC_KEY_PEM ?? undefined,
+    keyClass: 'step_up',
     ephemeralAllowed: env.NODE_ENV === 'development' || env.NODE_ENV === 'test',
     logger,
   });
   const jwtSigner = createJwtSigner({ keyPair: jwtKeyPair, issuer: env.JWT_ISSUER });
+
+  // ID-10 (H4 joint): the delegated-authority signing key is published in the
+  // same JWKS as the step-up key. Helpan AI's strawman names the kid literally
+  // (`helpan-da-2026-q2`); we honour the literal when provided. In dev/test
+  // an ephemeral keypair with a derived kid prefix is used.
+  const daKeyPair = loadOrGenerateKeys({
+    privatePem: env.JWT_DA_PRIVATE_KEY_PEM ?? undefined,
+    publicPem: env.JWT_DA_PUBLIC_KEY_PEM ?? undefined,
+    kidOverride: env.JWT_DA_KID ?? undefined,
+    keyClass: 'delegated_authority',
+    ephemeralAllowed: env.NODE_ENV === 'development' || env.NODE_ENV === 'test',
+    logger,
+  });
+  const delegatedAuthoritySigner = createDelegatedAuthoritySigner({
+    daKeys: [daKeyPair],
+    expectedIssuer: env.JWT_ISSUER,
+  });
   const phoneTokenSigningKey = Buffer.from(env.PHONE_TOKEN_SIGNING_KEY, 'hex');
   if (phoneTokenSigningKey.length < 32) {
     throw new Error(
@@ -119,22 +140,29 @@ async function main(): Promise<void> {
     phoneTokensRepo,
     kycRecordsRepo,
     phoneChangesRepo,
+    delegatedAuthoritySigningsRepo,
     phoneCrypto,
     eventProducer,
     auditLogger,
-    jwtKeys: [jwtKeyPair],
+    jwtKeys: [jwtKeyPair, daKeyPair],
     jwtSigner,
     phoneTokenSigner,
     iprsService,
     kycHasher,
     stepupVerifier,
+    delegatedAuthoritySigner,
     logger,
   });
 
   try {
     await app.listen({ host: '0.0.0.0', port: env.PORT });
     logger.info(
-      { port: env.PORT, env: env.NODE_ENV, kid: jwtKeyPair.kid },
+      {
+        port: env.PORT,
+        env: env.NODE_ENV,
+        step_up_kid: jwtKeyPair.kid,
+        delegated_authority_kid: daKeyPair.kid,
+      },
       'Identiti API listening'
     );
   } catch (err) {

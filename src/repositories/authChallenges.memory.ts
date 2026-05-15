@@ -22,25 +22,29 @@ export function createMemoryAuthChallengesRepo(): AuthChallengesRepo {
         intendedOperation: input.intendedOperation,
         operationAudience: input.operationAudience,
         operationRiskTier: input.operationRiskTier,
+        actor: input.actor ? { ...input.actor } : null,
+        initiatedBy: input.initiatedBy ?? null,
         createdAt: new Date(),
       };
       data.set(c.id, c);
-      return { ...c };
+      return { ...c, actor: c.actor ? { ...c.actor } : null };
     },
 
     async findById(id) {
       const c = data.get(id);
-      return c ? { ...c } : null;
+      return c ? { ...c, actor: c.actor ? { ...c.actor } : null } : null;
     },
 
     async recordAttempt(id, next) {
       const c = data.get(id);
       if (!c) return null;
-      if (c.status !== 'pending') return { ...c };
+      if (c.status !== 'pending') {
+        return { ...c, actor: c.actor ? { ...c.actor } : null };
+      }
       if (next.incrementAttempts) c.attemptsUsed += 1;
       c.status = next.status;
       c.consumedAt = next.consumedAt;
-      return { ...c };
+      return { ...c, actor: c.actor ? { ...c.actor } : null };
     },
   };
 }

@@ -10,6 +10,8 @@
 
 const ACCOUNT_UUID_PATTERN = '^acc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$';
 const CHALLENGE_ID_PATTERN = '^stp_[0-9A-HJKMNP-TV-Z]{26}$';
+const AGENT_ID_PATTERN = '^agt_[0-9A-HJKMNP-TV-Z]{26}$';
+const DA_JTI_PATTERN = '^daa_[0-9A-HJKMNP-TV-Z]{26}$';
 
 const FACTOR_ENUM = ['phone_otp', 'hardware_key', 'passive_biometric'] as const;
 const RISK_TIER_ENUM = ['low', 'medium', 'high', 'very_high'] as const;
@@ -22,8 +24,37 @@ const OPERATION_KIND_ENUM = [
   'identiti.phone_change',
   'identiti.account_close',
   'identiti.tier_2_promotion_evidence_view',
+  // ID-10 (H4 joint with Helpan AI): step-up token authorising the user's
+  // act of granting delegated authority to an agent. Per Delegated Authority
+  // Contract §1 ("The two compose") + §8.3.
+  'helpan_ai.authority_issuance',
   'app.custom_high_risk',
 ] as const;
+
+/**
+ * Special-cased audiences that are NOT URI-shaped. The strawman names
+ * `helpan_authority_issuance` as a bare audience string (Delegated Authority
+ * Contract §8.3). All other audiences must validate against `format: uri`.
+ */
+const NON_URI_AUDIENCES = ['helpan_authority_issuance'] as const;
+
+const operationAudienceSchema = {
+  oneOf: [
+    { type: 'string', format: 'uri' },
+    { type: 'string', enum: NON_URI_AUDIENCES },
+  ],
+} as const;
+
+const actorSchema = {
+  type: 'object',
+  required: ['type', 'agent_id'],
+  additionalProperties: false,
+  properties: {
+    type: { type: 'string', enum: ['agent'] },
+    agent_id: { type: 'string', pattern: AGENT_ID_PATTERN },
+    delegated_authority_jti: { type: 'string', pattern: DA_JTI_PATTERN },
+  },
+} as const;
 
 export const initiateStepupRequestSchema = {
   $id: 'https://schemas.id.identiti.co.ke/v1/InitiateStepupRequest.json',
@@ -38,11 +69,17 @@ export const initiateStepupRequestSchema = {
   additionalProperties: false,
   properties: {
     account_uuid: { type: 'string', pattern: ACCOUNT_UUID_PATTERN },
-    operation_audience: { type: 'string', format: 'uri' },
+    operation_audience: operationAudienceSchema,
     operation_kind: { type: 'string', enum: OPERATION_KIND_ENUM },
     operation_risk_tier: { type: 'string', enum: RISK_TIER_ENUM },
     factor: { type: 'string', enum: FACTOR_ENUM },
     device: { type: 'object' },
+    // Amendment §A.1/§A.2 — agentic-AI propagation. Optional at v1.0; an app
+    // dispatching a step-up on behalf of an agent populates these so the
+    // resulting step-up JWT carries the actor + initiated_by claims that
+    // KP/Todoku audit on relying-party calls.
+    actor: actorSchema,
+    initiated_by: { type: 'string', enum: ['human', 'agent', 'system'] },
   },
 } as const;
 

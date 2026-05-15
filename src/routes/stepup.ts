@@ -24,7 +24,9 @@ import { isAccountUuid } from '../domain/accountUuid.js';
 import type {
   AuthChallengesRepo,
   CustomersRepo,
+  InitiatedBy,
   RiskTier,
+  StepUpActor,
   StepUpTokensRepo,
 } from '../repositories/types.js';
 import type { EventProducer } from '../services/eventProducer.js';
@@ -44,6 +46,13 @@ interface InitiateBody {
   operation_risk_tier: RiskTier;
   factor: 'phone_otp' | 'hardware_key' | 'passive_biometric';
   device?: unknown;
+  // ID-10 (Amendment §A.1/§A.2) — agentic-AI propagation. Both optional.
+  actor?: {
+    type: 'agent';
+    agent_id: string;
+    delegated_authority_jti?: string;
+  };
+  initiated_by?: InitiatedBy;
 }
 
 interface VerifyBody {
@@ -135,6 +144,19 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
         const challengeId = `stp_${generateUlid()}`;
         const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
 
+        // ID-10: hold the agentic-AI propagation claims on the challenge row
+        // so /v1/stepup/verify can stamp them into the resulting JWT.
+        const challengeActor: StepUpActor | undefined = data.actor
+          ? {
+              type: data.actor.type,
+              ...(data.actor.agent_id ? { agentId: data.actor.agent_id } : {}),
+              ...(data.actor.delegated_authority_jti
+                ? { delegatedAuthorityJti: data.actor.delegated_authority_jti }
+                : {}),
+            }
+          : undefined;
+        const challengeInitiatedBy: InitiatedBy | undefined = data.initiated_by;
+
         await deps.challengesRepo.create({
           id: challengeId,
           accountId: data.account_uuid,
@@ -146,12 +168,15 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
           intendedOperation: data.operation_kind,
           operationAudience: data.operation_audience,
           operationRiskTier: data.operation_risk_tier,
+          ...(challengeActor ? { actor: challengeActor } : {}),
+          ...(challengeInitiatedBy ? { initiatedBy: challengeInitiatedBy } : {}),
         });
 
         // STEP_UP_REQUIRED → identiti.step_up.events. Todoku consumes and
         // delivers the OTP. v1.0 sends OTP plaintext in the payload (sandbox);
         // production will encrypt with Todoku's per-tenant public key per
-        // Reboot Pack §16.8.
+        // Reboot Pack §16.8. actor + initiated_by are carried so downstream
+        // audit (Helpan AI, KP, Todoku) can join on the same business op.
         await deps.eventProducer.publish({
           topic: 'identiti.step_up.events',
           key: data.account_uuid,
@@ -166,6 +191,18 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
             factor: 'phone_otp',
             otp_plaintext: otp,
             expires_at: expiresAt.toISOString(),
+            ...(challengeActor
+              ? {
+                  actor: {
+                    type: challengeActor.type,
+                    ...(challengeActor.agentId ? { agent_id: challengeActor.agentId } : {}),
+                    ...(challengeActor.delegatedAuthorityJti
+                      ? { delegated_authority_jti: challengeActor.delegatedAuthorityJti }
+                      : {}),
+                  },
+                }
+              : {}),
+            ...(challengeInitiatedBy ? { initiated_by: challengeInitiatedBy } : {}),
           },
         });
 
@@ -184,6 +221,14 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
             operation_kind: data.operation_kind,
             operation_risk_tier: data.operation_risk_tier,
             operation_audience: data.operation_audience,
+            ...(challengeActor
+              ? {
+                  actor_type: challengeActor.type,
+                  actor_agent_id: challengeActor.agentId ?? null,
+                  delegated_authority_jti: challengeActor.delegatedAuthorityJti ?? null,
+                }
+              : {}),
+            ...(challengeInitiatedBy ? { initiated_by: challengeInitiatedBy } : {}),
           },
         });
 
@@ -356,6 +401,10 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
         factor: challenge.factor,
         env: deps.envName,
         expiresInSeconds,
+        // ID-10: forward the actor + initiated_by captured at /v1/stepup/challenges
+        // so the issued JWT carries the §A.1/§A.2 claims relying parties audit.
+        ...(challenge.actor ? { actor: challenge.actor } : {}),
+        ...(challenge.initiatedBy ? { initiatedBy: challenge.initiatedBy } : {}),
       });
 
       await deps.stepUpTokensRepo.create({
@@ -369,6 +418,8 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
         env: deps.envName,
         iat: signed.issuedAt,
         exp: signed.expiresAt,
+        ...(challenge.actor ? { actor: challenge.actor } : {}),
+        ...(challenge.initiatedBy ? { initiatedBy: challenge.initiatedBy } : {}),
       });
 
       await deps.auditLogger.append({

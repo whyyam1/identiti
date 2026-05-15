@@ -26,11 +26,13 @@ import { stepupRoutes } from './routes/stepup.js';
 import { phoneTokensRoutes } from './routes/phoneTokens.js';
 import { phoneChangeRoutes } from './routes/phoneChange.js';
 import { kycRoutes } from './routes/kyc.js';
+import { internalRoutes } from './routes/internal.js';
 import type { Env } from './config/env.js';
 import type { Logger } from './lib/logger.js';
 import type {
   AuthChallengesRepo,
   CustomersRepo,
+  DelegatedAuthoritySigningsRepo,
   KycRecordsRepo,
   PhoneChangesRepo,
   PhoneTokensRepo,
@@ -46,6 +48,7 @@ import type { PhoneTokenSigner } from './services/phoneTokenSigner.js';
 import type { IprsService } from './services/iprsService.js';
 import type { KycHasher } from './services/kycHash.js';
 import type { StepupVerifier } from './services/stepupVerifier.js';
+import type { DelegatedAuthoritySigner } from './services/delegatedAuthoritySigner.js';
 
 export interface AppDeps {
   env: Env;
@@ -58,15 +61,18 @@ export interface AppDeps {
   phoneTokensRepo: PhoneTokensRepo;
   kycRecordsRepo: KycRecordsRepo;
   phoneChangesRepo: PhoneChangesRepo;
+  delegatedAuthoritySigningsRepo: DelegatedAuthoritySigningsRepo;
   phoneCrypto: PhoneCrypto;
   eventProducer: EventProducer;
   auditLogger: AuditLogger;
+  /** All JWKS-publishable RSA keys — both step-up (Phase 3/5) and delegated-authority (ID-10). */
   jwtKeys: readonly JwtKeyPair[];
   jwtSigner: JwtSigner;
   phoneTokenSigner: PhoneTokenSigner;
   iprsService: IprsService;
   kycHasher: KycHasher;
   stepupVerifier: StepupVerifier;
+  delegatedAuthoritySigner: DelegatedAuthoritySigner;
   logger: Logger;
 }
 
@@ -184,6 +190,16 @@ export async function buildApp(deps: AppDeps) {
       kycRecordsRepo: deps.kycRecordsRepo,
       eventProducer: deps.eventProducer,
       auditLogger: deps.auditLogger,
+    })
+  );
+  await app.register(
+    internalRoutes({
+      customersRepo: deps.customersRepo,
+      stepUpTokensRepo: deps.stepUpTokensRepo,
+      delegatedAuthoritySigningsRepo: deps.delegatedAuthoritySigningsRepo,
+      delegatedAuthoritySigner: deps.delegatedAuthoritySigner,
+      auditLogger: deps.auditLogger,
+      helpanAiAppId: deps.env.HELPAN_AI_APP_ID,
     })
   );
 

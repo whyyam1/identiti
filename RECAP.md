@@ -1,8 +1,9 @@
 # Identiti Rail — Build Progress and Sprint Tracker
 
 **Document type:** Rail-specific progress tracker. Update at each sprint close.
-**Date:** 9 May 2026
+**Date:** 13 May 2026
 **Cross-rail source of truth:** `c:\Projects\Platform Rails-instruction pack v1-reboot pack v1.2\RECAP.md` — read this file's §3 (dependency graph) and §5 (critical path) before starting any sprint.
+**Cross-rail canonical record:** `c:\Projects\Platform Rails-instruction pack v1-reboot pack v1.2\Platform_Rails_Reboot_Pack_v1_2.md` (v1.2 + Amendment §A, 7 May 2026) — read §7 (Identiti locked decisions), §16.8 (cross-rail wiring), §A (cross-rail scan integration) before sprint kickoff.
 **Rail design corpus:** `Identiti_Rail_Contract_v1.0_Scaffold.md` + Schema Appendix + Amendment §A; `docs/INTEGRATION_MAP.md`; `README.md`.
 
 ---
@@ -10,44 +11,50 @@
 ## 1. Where this rail is
 
 **Design phase:** ✅ complete (Chamia-canonical contract + scan amendments).
-**Code:** 🟢 ID-1..ID-9 closed (ID-9 minus BR-AI-5 KYC vendor IAD sign-off — non-code, procurement Track A). 130/130 tests pass; typecheck clean. Customer-facing identity surface complete; operator console covers suspend/reactivate, tier-override, audit-trail read, KYC pending list, KYC approve, KYC reject. Remaining ID sprints are blocked: ID-10 (H4 with Helpan AI), ID-11 (cross-rail testing), ID-Beta/GA (Stage advances).
-**Stack:** Node.js 22 LTS · TypeScript 5.x strict · Fastify 4.x · AJV (JSON Schema 2020-12) · PostgreSQL 16 via Supabase (af-south-1) · Drizzle ORM · Kafka (kafkajs) · Vitest · Railway.
+**Code:** 🟢 ID-1..ID-10 closed (ID-9 minus BR-AI-5 KYC vendor IAD sign-off — non-code, procurement Track A). 147/147 tests pass; typecheck clean. Customer-facing identity surface complete; operator console covers suspend/reactivate, tier-override, audit-trail read, KYC pending list, KYC approve, KYC reject. ID-10 (H4 joint with Helpan AI) shipped: `POST /v1/internal/sign` delegated-authority signing API, `helpan_authority_issuance` step-up audience, request-side `actor`/`initiated_by` plumbing. **H-3 (Helpan AI) is now unblocked.** ID-11 / ID-Beta / ID-GA still blocked.
+**Stack:** Node.js 22 LTS · TypeScript 5.x strict · Fastify 4.x · AJV (JSON Schema 2020-12) · PostgreSQL 17 via Supabase (eu-west-1) · Drizzle ORM · Kafka (kafkajs) · Vitest · Railway.
 **Dependencies:** `@kmv/platform-shared` from `C:\Projects\platform-shared\`.
+**Sandbox DB:** Supabase project `Identiti` (`tjqpyblyoslyoplmnlua`, eu-west-1, org `kipkiren3`). Migrations 0001–0008 applied 13 May 2026; 12 tables, RLS on all. `DATABASE_URL` in `.env` (gitignored). Region is eu-west-1, not the Reboot Pack §16.7 `af-south-1` — matches the rest of the KMV Supabase footprint.
 
-**Standing position:** Identiti is the **root of the trust graph.** Every other rail blocks on it. Build first, ship Phase 1–6 to staging before anyone else needs it.
+**Standing position:** Identiti is the **root of the trust graph** and the agent-credential authority per Reboot Pack §A.5 — Helpan AI is registry/scope/dispatch/audit; Identiti is OAuth issuance + the delegated-authority signer. Every other rail blocks on Identiti.
 
 ---
 
 ## 1.1 Next session — start here
 
-Code state at end of 9 May 2026 session: ID-1..ID-9 closed, 130/130 tests pass, typecheck clean, last commit `724d1b3` pushed to `origin/main` (https://github.com/whyyam1/identiti.git). Customer-facing identity surface is complete; operator console covers all Phase 9 endpoints. Identiti has hit the wall for blocker-free build work — what comes next depends on cross-rail movement and ops decisions outside this rail.
+Code state as of 13 May 2026: **ID-1..ID-10 closed**, 147/147 tests pass, typecheck clean. Customer-facing identity surface complete; operator console covers all Phase 9 endpoints; ID-10 H4 joint with Helpan AI shipped (`POST /v1/internal/sign`, delegated-authority key class, `helpan_authority_issuance` audience, request-side `actor`/`initiated_by`). Sandbox DB live on Supabase (`tjqpyblyoslyoplmnlua`, eu-west-1; migrations 0001–0008 applied). Every locally-buildable Identiti sprint is now done.
 
-**Before doing anything, check:**
+**Cross-rail state as of 13 May 2026** (per [`../Platform Rails-instruction pack v1-reboot pack v1.2/RECAP.md`](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/RECAP.md) §1.3):
 
-1. **Cross-rail movement overnight.** Read [`../Platform Rails-instruction pack v1-reboot pack v1.2/RECAP.md`](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/RECAP.md) §1.3. If any of the following moved, that opens new work here:
-   - **Helpan AI H-3 closed** → ID-10 (H4 joint) unblocks. Confirm the Delegated Authority Contract §8 strawman is now finalised; then start ID-10 (kid namespace, internal `POST /v1/internal/sign`, step-up audience `helpan_authority_issuance`, cascade-revocation Kafka events). The signer + step_up_tokens table already carry the Amendment §A.1 columns from the start, so there's no migration debt — just route + signing-API + audience plumbing.
-   - **KP-1 / KP-2 in flight** → KP will be consuming `identiti.account.events.TIER_CHANGED` and verifying step-up tokens against `/.well-known/jwks.json`. Be available for integration questions; consider running an end-to-end smoke test together.
-   - **Todoku TD-1 / TD-2 in flight** → Todoku will be consuming `STEP_UP_REQUIRED` (including the new `target.kind='new_phone'` payload from ID-7) and resolving phone tokens via `POST /v1/phone-tokens/resolve`. Same: be available; consider end-to-end test.
+- **Helpan AI H-3 is now UNBLOCKED.** ID-10 shipped the joint signing surface H-3 was hard-blocked on. The H4 sign-off memo is at [`docs/H4_HELPAN_AI_JOINT.md`](docs/H4_HELPAN_AI_JOINT.md) — that's what Helpan AI engineering reads to build H-3 against. Be available for H-3 integration questions.
+- **Kipkiren Pay:** still ❌ not started (KP-1 [ ]). When KP-2 / KP-4 start they consume `TIER_CHANGED` + the JWKS — be available.
+- **Todoku:** TD-1 in flight. TD-2 will consume `STEP_UP_REQUIRED` (now optionally carrying `actor`/`initiated_by` from ID-10).
 
-2. **Pick a track.** If nothing moved cross-rail, the candidate work is:
-   - **(A) Operational hardening before Stage 1** — ESLint + Prettier are listed in Instruction Pack §1 as required but aren't wired here yet. CI workflow (GitHub Actions: lint → test → build) likewise. Add `lint` script to `package.json`, an `.eslintrc`, a `.prettierrc`, and `.github/workflows/ci.yml`. Adds the §14 handoff checklist line item; small, no external dep.
-   - **(B) Sandbox deployment** — provision the Supabase project (`identiti`, region `af-south-1`), apply migrations 0001–0007, deploy to Railway. Not blocked by other rails — the rail can run in isolation since Kafka consumers (KP, Todoku) just don't subscribe yet.
-   - **(C) Backlog code items** — none on the critical path, but useful when cross-rail integration testing starts:
-     - Customer-facing tier history (`GET /v1/customers/:uuid/tier/history`, Schema Appendix §6.4)
-     - Customer-facing tier-promotion request (`POST /v1/customers/:uuid/tier/request-promotion`, Schema Appendix §6.2–§6.3)
-     - `POST /v1/stepup/tokens/validate` (diagnostic; Schema Appendix §7.5; KP validates locally so this is low priority)
-     - JWKS multi-key rotation orchestrator (currently single key; the `JwtKeyPair[]` plumbing is ready)
-     - Factor-upgrade rules in `/v1/stepup/challenges` (very_high → upgrade phone_otp → hardware_key)
+**Pick a track — nothing on this rail is blocker-free critical-path anymore:**
 
-3. **Standing rules to keep in mind** (from the user's CLAUDE.md):
-   - Confirm scope before significant changes.
-   - Code as files only, never chat blocks.
-   - KES minor units only — no floating point (irrelevant here; KP's concern).
-   - Account UUID format: `acc_<uuid v4>`.
-   - Auth: Bearer JWT for customer-side; HMAC-SHA-256 + mTLS for service-side.
-   - Cardinal rule: Identiti owns identity. Does NOT hold funds, send messages, or initiate financial operations.
+- **(A) Operational hardening before Stage 1** — ESLint + Prettier are listed in Instruction Pack §1 as required but aren't wired here yet. CI workflow (GitHub Actions: lint → test → build) likewise. Add `lint` script to `package.json`, an `.eslintrc`, a `.prettierrc`, and `.github/workflows/ci.yml`. Small, no external dep.
+- **(B) Railway deploy** — the Supabase DB is provisioned and migrated; what's left of track (B) is deploying the Identiti app to Railway against that `DATABASE_URL`, plus real RS256 PEMs + real crypto keys (the `.env` values are dev placeholders) and a real Kafka cluster. Sandbox base URL `sandbox.id.identiti.co.ke` per [Reboot Pack §16.8](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/Platform_Rails_Reboot_Pack_v1_2.md).
+- **(C) ID-11 cross-rail integration testing** — unblocks once KP / Todoku reach Sprint 5+. Not yet.
+- **(D) Backlog code items** — none on the critical path:
+  - Customer-facing tier history (`GET /v1/customers/:uuid/tier/history`, Schema Appendix §6.4)
+  - Customer-facing tier-promotion request (`POST /v1/customers/:uuid/tier/request-promotion`, Schema Appendix §6.2–§6.3)
+  - `POST /v1/stepup/tokens/validate` (diagnostic; Schema Appendix §7.5; KP validates locally so this is low priority)
+  - JWKS multi-key **rotation orchestrator** — JWKS now publishes 2 keys (step-up + delegated-authority); the 90-day rotation/overlap orchestration is still manual (`JWT_DA_KID` + PEM swap)
+  - Factor-upgrade rules in `/v1/stepup/challenges` (very_high → upgrade phone_otp → hardware_key)
+  - §8.5 v1.1 cascade events (`ACCOUNT_DELETED`, `CONSENT_REVOKED`) + §8.4 CAEP — deferred per `docs/H4_HELPAN_AI_JOINT.md`
 
-**Recommended first action:** spend 5 minutes reading the central RECAP §1.3 to see what moved overnight on KP / Todoku / Helpan AI. Pick (A) or (B) if nothing moved; pick the unblocked sprint if it did.
+**Standing rules to keep in mind** (from the user's CLAUDE.md and [Reboot Pack §16.10](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/Platform_Rails_Reboot_Pack_v1_2.md)):
+
+- Confirm scope before significant changes.
+- Code as files only, never chat blocks.
+- KES minor units only — no floating point (irrelevant here; KP's concern).
+- Account UUID format: `acc_<uuid v4>`.
+- Auth: Bearer JWT for customer-side; HMAC-SHA-256 + mTLS for service-side.
+- Cardinal rule: Identiti owns identity. Does NOT hold funds, send messages, or initiate financial operations.
+- **JIT identity posture** ([Reboot Pack §A.1](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/Platform_Rails_Reboot_Pack_v1_2.md)) — no long-lived bearer tokens, no static service accounts, no refresh on elevated scopes.
+- **Commits:** no `Co-Authored-By: Claude` trailer, no "Generated with Claude Code" footer (user instruction, 13 May 2026).
+
+**Recommended first action:** pick (A) or (B). (A) clears Instruction Pack §1 / §14 handoff-checklist debt and is self-contained; (B) gets the rail running in a sandbox. Neither is blocked.
 
 ---
 
@@ -66,7 +73,7 @@ Conventions: 2-week sprints. Status: [ ] open · [~] in flight · [x] done. Upda
 | **ID-7** | Phone management — change-request, change-confirm, two-phone OTP flow, `PHONE_CHANGED` Kafka event | §6.3 Phase 7 | Todoku ID-2 minimal | [x] | Closed 9 May 2026. Two endpoints: `POST /v1/customers/:uuid/profile/phone-change` (per Schema Appendix §10.3) + `POST /.../phone-change/confirm` (Instruction Pack §6.3 #20; not in Schema Appendix). X-Stepup-Token required at initiate, verified locally against own JWKS via new `stepupVerifier` (operation_kind=`identiti.phone_change`, audience=Identiti, sub=path uuid, JTI single-use via `step_up_tokens.consumed_at` per §16.3 step 12). Two verification methods: `otp_to_old_phone` completes synchronously (step-up to old IS the proof); `otp_to_new_phone_with_step_up_to_old` is async (initiate publishes STEP_UP_REQUIRED with `target.kind='new_phone'` for Todoku to deliver to the new number; confirm verifies the OTP). Cooldown via `phoneCooldown` helpers (24h default; 7d when KP balance active — KP not built yet). PHONE_CHANGED published to `identiti.phone.events`. Cross-rail unblock: Todoku TD-2 needs to handle the new-phone target in STEP_UP_REQUIRED |
 | **ID-8** | Tier signal endpoint, Operator console endpoints | §6.3 Phase 8–9 | None | [x] | Closed 9 May 2026. Tier signal now emits `Cache-Control: private, max-age=60` + `next_review_at` on tier_2 (Schema Appendix §6.1 polish). Phase 9 operator console: `GET /v1/operator/customers/:uuid/audit`, `GET /v1/operator/kyc/pending`, `POST /v1/operator/kyc/:id/approve` (with tier_0 → tier_1 promotion when artefact.tier='tier_1' + KYC_APPROVED + TIER_CHANGED Kafka), `POST /v1/operator/kyc/:id/reject` (KYC_REJECTED Kafka). Tier-override + suspend/reactivate already shipped in earlier sprints. Customer-facing tier history (§6.4) and tier-promotion-request (§6.2-6.3) deferred — not in §6.3 Phase 8-9 scope, app-facing only |
 | **ID-9** | Scan additions — IAD vendor capability sign-off (BR-AI-5), JIT posture documentation, auth JWT TTL enforcement on elevated scopes | Identiti Rail Contract Amendment §A | KYC vendor RFQ (procurement) | [x] | Closed 9 May 2026 (code parts; BR-AI-5 KYC vendor IAD sign-off remains procurement Track A — out of code scope). §A.4 elevated-scope TTL branch wired in `/v1/auth/customer-token` (latent today; activates the moment a scope drops into `ELEVATED_CUSTOMER_SCOPES`). JIT posture documented in `docs/INTEGRATION_MAP.md` §11.2.1 with the canonical TTL table cross-referencing §A.4 / §A.5 |
-| **ID-10** | **H4 joint with Helpan AI** — internal signing API (`POST /v1/internal/sign`); step-up audience `helpan_authority_issuance` added; cascade-revocation Kafka events confirmed | Helpan AI Delegated Authority Contract §8 | Helpan AI H-3 in flight | [ ] | **CRITICAL — blocks Helpan AI delegated authority issuance** |
+| **ID-10** | **H4 joint with Helpan AI** — internal signing API (`POST /v1/internal/sign`); step-up audience `helpan_authority_issuance` added; cascade-revocation Kafka events confirmed; `kid` namespace shared with Helpan AI; CAEP-compatible topology (per-token revocation events MUST be possible in v1.1 per Reboot Pack §A.9) | Helpan AI Delegated Authority Contract §8 | None — strawman already on disk | [x] | Closed 13 May 2026. `POST /v1/internal/sign` ships behind scope `identiti:internal:sign:delegated_authority` + pinned `HELPAN_AI_APP_ID`; separate `delegated_authority` RS256 key class published in JWKS by literal `kid` (`helpan-da-*`). Per-scope-class TTL bounds enforced (≤3600s money / ≤900s identity / ≤86400s read-only). `helpan_authority_issuance` audience + `helpan_ai.authority_issuance` operation kind added; `actor`/`initiated_by` now populated request-side on `/v1/stepup/challenges` (was emission-only). §8.5 cascade events: `ACCOUNT_SUSPENDED` ✅ live, `KYC_DOWNGRADED` → use `TIER_CHANGED` payload, `ACCOUNT_DELETED` + `CONSENT_REVOKED` deferred to v1.1 (no v1.0 source). §8.4 CAEP deferred to v1.1. H4 sign-off written to `docs/H4_HELPAN_AI_JOINT.md`. **Cross-rail unblock: Helpan AI H-3 can begin.** |
 | **ID-11** | Cross-rail integration testing | Handoff §14 | All other rails Sprint 5+ | [ ] | |
 | **ID-Beta** | Stage 2 closed beta — production deployment, DR drill, runbooks, load test, pen-test C+H resolved | DoD §7.3 | All Identiti sprints done | [ ] | |
 | **ID-GA** | Stage 3 production — ODPC registration complete, DPA 2019 sign-off, GA traffic | DoD §7.4 | H14 closed | [ ] | |
@@ -121,6 +128,7 @@ If anything below conflicts, the source documents win:
 | ID-7 | **Routes:** `POST /v1/customers/:uuid/profile/phone-change` (initiate), `POST /.../phone-change/confirm`. **Migration:** `drizzle/0007_phone_changes.sql` (phone_changes table + `step_up_tokens.consumed_at` ALTER for §16.3 single-use). **Modules:** `src/routes/phoneChange.ts`, `src/schemas/phoneChange.ts`, `src/repositories/phoneChanges{,memory}.ts`, `src/services/stepupVerifier.ts` (local RS256 verification + JTI consumption). **CustomersRepo extensions:** `getPhoneRecord`, `swapPhone`; in-memory store now tracks `phoneCooldownUntil` + `phoneLastChangeAt`. **StepUpTokensRepo extension:** `markConsumed(jti)` for atomic single-use. **Tests:** `tests/phoneChange.test.ts` — 14 tests covering both verification methods, missing/expired/invalid/replayed step-up tokens, wrong subject, cooldown gate, same-phone rejection, cross-account collision, OTP failures, max-attempts cancel, unknown change_id, cross-customer path mismatch |
 | ID-8 | **Tier signal:** `Cache-Control: private, max-age=60` header + `next_review_at` for tier_2 (`src/routes/tier.ts`). **Operator console additions:** `GET /v1/operator/customers/:uuid/audit`, `GET /v1/operator/kyc/pending`, `POST /v1/operator/kyc/:id/approve`, `POST /v1/operator/kyc/:id/reject` in `src/routes/operator.ts`. **AuditLogger extension:** `listByResource(resourceType, resourceId, opts?)` with limit clamp. **KycRecordsRepo extensions:** `listByStatus`, `markVerified`, `markFailed`. **Schemas:** `operatorKycApproveRequestSchema`, `operatorKycRejectRequestSchema` in `src/schemas/operator.ts`. **Kafka:** new `KYC_REJECTED` event type. **Tests:** `tests/operatorAdmin.test.ts` (13) + 2 new tests in `tests/tier.test.ts` |
 | ID-9 | **Code:** §A.4 elevated-scope TTL branch in `src/routes/auth.ts` (`ELEVATED_CUSTOMER_SCOPES` is intentionally empty in v1.0 — drop-in activation). **Docs:** JIT posture paragraph + canonical TTL table in `docs/INTEGRATION_MAP.md` §11.2.1, cross-referencing Schema Appendix Amendment §A.4 + §A.5. **Out of scope (procurement, not code):** BR-AI-5 KYC vendor IAD verification — Track A, blocks Stage 1 vendor onboarding |
+| ID-10 | **Routes:** `POST /v1/internal/sign` (Helpan AI delegated-authority signing; scope `identiti:internal:sign:delegated_authority` + `HELPAN_AI_APP_ID` pin). **Migration:** `drizzle/0008_delegated_authority_signings.sql` (creates `delegated_authority_signings` audit ledger; ALTERs `auth_challenges` with `actor_type`/`actor_agent_id`/`actor_delegated_authority_jti`/`initiated_by`). **Modules:** `src/routes/internal.ts`, `src/schemas/internal.ts`, `src/services/delegatedAuthoritySigner.ts` (raw-claims RS256 signer + per-scope-class TTL bounds), `src/repositories/delegatedAuthoritySignings{,.memory}.ts`. **Key management:** `JwtKeyClass` (`step_up` / `delegated_authority`) on `JwtKeyPair`; `loadOrGenerateKeys` takes `keyClass` + `kidOverride`; JWKS now publishes both keys. **Step-up extensions:** `helpan_authority_issuance` audience + `helpan_ai.authority_issuance` operation kind in `src/schemas/stepup.ts`; `actor`/`initiated_by` request-side population in `src/routes/stepup.ts` + `auth_challenges` repo. **Env:** `JWT_DA_PRIVATE_KEY_PEM`, `JWT_DA_PUBLIC_KEY_PEM`, `JWT_DA_KID`, `HELPAN_AI_APP_ID`. **Docs:** `docs/H4_HELPAN_AI_JOINT.md` (§8.1–§8.5 sign-off). **Tests:** `tests/internalSign.test.ts` (12) + `tests/stepupActor.test.ts` (5); `tests/jwks.test.ts` updated for the 2-key JWKS — 147/147 total. **Deferred to v1.1:** §8.4 CAEP, §8.5 `ACCOUNT_DELETED` + `CONSENT_REVOKED` cascade events |
 | … | |
 
 ---
@@ -135,7 +143,10 @@ Cross-rail or programme-level events that touch this rail without producing a sp
 - 9 May 2026 — ID-7 (phone management) closed. Customer-facing identity surface now complete through Phase 7. Cross-rail note: Todoku TD-2 must consume STEP_UP_REQUIRED with optional `target.kind='new_phone'` + `target.phone_plaintext` (sandbox; production encrypts per §16.8) for the change-OTP delivery path. Apps that need to issue a phone-change-scoped step-up token now have the full flow: `/v1/stepup/challenges` with operation_kind=`identiti.phone_change` → `/v1/stepup/verify` → `/v1/customers/:uuid/profile/phone-change` with X-Stepup-Token.
 - 9 May 2026 — ID-8 + ID-9 closed (code parts). Operator console now covers all Phase 9 endpoints (audit-read, KYC pending list / approve / reject, tier-override, suspend/reactivate). Tier signal emits proper `Cache-Control` for KP's 60s consumer cache. JIT posture canonically documented. **All ID-* sprints buildable without external blockers are now closed.** Remaining ID-10 / ID-11 / ID-Beta / ID-GA depend on Helpan AI H-3, KP/Todoku/Helpan AI Sprint 5+, or Stage gates respectively.
 - 9 May 2026 — End-of-day. Repo pushed to https://github.com/whyyam1/identiti.git on `main` (last commit `724d1b3`). 4 commits this session: `331800b` initial scaffold + ID-1..ID-6 close · `d3cc480` ID-4 · `43fda3a` ID-7 · `724d1b3` ID-8 + ID-9. Identiti has hit the cross-rail wall — pickup tomorrow is conditional on what moved on KP / Todoku / Helpan AI. See §1.1 above.
+- 13 May 2026 — Cross-rail status re-read. **Helpan AI surged 11 May 2026**: H-1 + H-2 + H-5 + H-6 + H-7 closed; 111/111 tests green; 16 endpoints live; Kafka producer surface live (`helpan.briefing.events.BRIEFING_MATCHED`); webhook delivery worker as separate Railway entrypoint. **Every locally-buildable Helpan AI Stage-1 sprint is done; H-3 is hard-blocked on Identiti ID-10** per central RECAP §1.3. Reboot Pack v1.2 + Amendment §A re-read in full: §16.8 cross-rail wiring, §A.1 JIT identity posture as platform-wide commitment, §A.2 `actor` / `initiated_by` claim propagation, §A.5 Helpan AI as agent-authority rail (Identiti = OAuth issuance authority; Helpan AI = registry/scope/dispatch/audit; ID-10 is the joint signing surface), §A.9 CAEP topology constraint (Kafka MUST not preclude per-token revocation events), §A.11 hard build-acceptance criterion — `traceparent` + `business_op_id` cross-rail audit invariant. **ID-10 unblock direction corrected** in this RECAP (§1.1 + §2 ID-10 row): strawman in Helpan AI Delegated Authority Contract §8 is already ✅; ID-10 is the next critical-path sprint, not the gated one.
+- 13 May 2026 — **ID-10 built and closed.** H4 joint with Helpan AI: `POST /v1/internal/sign` delegated-authority signing API, separate `delegated_authority` RS256 key class published in JWKS, `helpan_authority_issuance` step-up audience, request-side `actor`/`initiated_by` plumbing, migration 0008. 147/147 tests pass; typecheck clean. H4 sign-off memo at `docs/H4_HELPAN_AI_JOINT.md`. **Cross-rail unblock landed: Helpan AI H-3 (delegated authorities) can begin.** §8.4 CAEP + §8.5 `ACCOUNT_DELETED`/`CONSENT_REVOKED` cascade events deferred to v1.1 (no v1.0 source).
+- 13 May 2026 — Sandbox DB provisioned. Supabase project `Identiti` (`tjqpyblyoslyoplmnlua`, eu-west-1, Postgres 17, org `kipkiren3`) connected; migrations 0001–0008 applied (12 tables, RLS on all). `DATABASE_URL` lives in `.env` (gitignored). Region eu-west-1 chosen over Reboot Pack §16.7 `af-south-1` to match the rest of the KMV Supabase footprint. Track (B) sandbox groundwork done short of the Railway app deploy.
 
 ---
 
-*Identiti Rail · Build Progress · 9 May 2026 · update at each sprint close*
+*Identiti Rail · Build Progress · 13 May 2026 · update at each sprint close*
