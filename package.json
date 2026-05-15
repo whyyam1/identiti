@@ -8,6 +8,7 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.build.json",
@@ -20,7 +21,7 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
-    "@kmv/platform-shared": "file:../platform-shared",
+    "@kmv/platform-shared": "file:./vendor/platform-shared",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "bcryptjs": "^2.4.3",

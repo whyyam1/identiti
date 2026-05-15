@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@kmv/platform-shared':
-        specifier: file:../platform-shared
-        version: file:../platform-shared(fastify@4.29.1)
+        specifier: file:./vendor/platform-shared
+        version: file:vendor/platform-shared(fastify@4.29.1)
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
@@ -659,8 +659,8 @@ packages:
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
 
-  '@kmv/platform-shared@file:../platform-shared':
-    resolution: {directory: ../platform-shared, type: directory}
+  '@kmv/platform-shared@file:vendor/platform-shared':
+    resolution: {directory: vendor/platform-shared, type: directory}
     engines: {node: '>=22.0.0'}
     peerDependencies:
       fastify: ^4.0.0
@@ -1746,7 +1746,7 @@ snapshots:
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
-  '@kmv/platform-shared@file:../platform-shared(fastify@4.29.1)':
+  '@kmv/platform-shared@file:vendor/platform-shared(fastify@4.29.1)':
     dependencies:
       fastify-plugin: 4.5.1
       ulid: 2.4.0

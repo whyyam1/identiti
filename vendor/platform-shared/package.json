@@ -1,0 +1,66 @@
+{
+  "name": "@kmv/platform-shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared utilities for the KMV Platform Rails — HMAC signing, ULID, money types, idempotency interface, response envelope, traceparent, Fastify plugins. VENDORED build artefact — see VENDORED.md.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./hmac": {
+      "types": "./dist/hmac.d.ts",
+      "import": "./dist/hmac.js"
+    },
+    "./ulid": {
+      "types": "./dist/ulid.d.ts",
+      "import": "./dist/ulid.js"
+    },
+    "./money": {
+      "types": "./dist/money.d.ts",
+      "import": "./dist/money.js"
+    },
+    "./envelope": {
+      "types": "./dist/envelope.d.ts",
+      "import": "./dist/envelope.js"
+    },
+    "./trace": {
+      "types": "./dist/trace.d.ts",
+      "import": "./dist/trace.js"
+    },
+    "./idempotency": {
+      "types": "./dist/idempotency.d.ts",
+      "import": "./dist/idempotency.js"
+    },
+    "./fastify-auth": {
+      "types": "./dist/fastify/authPlugin.d.ts",
+      "import": "./dist/fastify/authPlugin.js"
+    },
+    "./fastify-idempotency": {
+      "types": "./dist/fastify/idempotencyPlugin.d.ts",
+      "import": "./dist/fastify/idempotencyPlugin.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "fastify-plugin": "^4.5.1",
+    "ulid": "^2.3.0"
+  },
+  "peerDependencies": {
+    "fastify": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "fastify": {
+      "optional": true
+    }
+  }
+}

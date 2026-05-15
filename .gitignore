@@ -1,5 +1,8 @@
 node_modules/
-dist/
+# Anchored to the repo root so it ignores Identiti's own build output
+# (./dist) but NOT the vendored vendor/platform-shared/dist, which must be
+# committed for Railway deploys.
+/dist/
 coverage/
 .env
 .env.local

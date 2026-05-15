@@ -1,0 +1,22 @@
+build: vendor @kmv/platform-shared + Railway deploy config
+
+Make the repo self-contained and deployable. The `file:../platform-shared`
+path dependency does not survive a separate-repo deploy — Railway clones
+only this repo, so the sibling folder is absent and `pnpm install` fails
+(platform-shared README, "Mode B").
+
+- Vendor @kmv/platform-shared's built dist/ into vendor/platform-shared/
+  with a trimmed consumer package.json; repoint the dependency to
+  file:./vendor/platform-shared. Provenance + re-vendor steps in
+  vendor/platform-shared/VENDORED.md. Interim measure — the long-term
+  plan is publishing to a private registry (README "Mode A").
+- .gitignore: anchor the dist/ rule to /dist/ so it ignores Identiti's
+  own build output but not the vendored vendor/platform-shared/dist.
+- railway.json: Nixpacks builder, pnpm start, /v1/health check.
+- .nvmrc (22) + packageManager pin (pnpm@10.33.0) for deterministic
+  Railway builds.
+- docs/RAILWAY_DEPLOY.md: deploy steps + env-var checklist (development
+  vs staging profiles).
+
+147/147 tests pass; typecheck + build clean; pnpm install --frozen-lockfile
+verified.
