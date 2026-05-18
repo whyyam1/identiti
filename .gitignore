@@ -6,6 +6,8 @@ node_modules/
 coverage/
 .env
 .env.local
+# Generated RSA keypairs + the Railway staging variable block — never committed.
+secrets/
 *.log
 *.tmp
 .DS_Store
