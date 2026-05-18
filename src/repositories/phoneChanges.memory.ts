@@ -2,11 +2,7 @@
  * In-memory PhoneChangesRepo for tests.
  */
 
-import type {
-  PhoneChange,
-  PhoneChangeInsert,
-  PhoneChangesRepo,
-} from './types.js';
+import type { PhoneChange, PhoneChangeInsert, PhoneChangesRepo } from './types.js';
 
 function inflate(input: PhoneChangeInsert): PhoneChange {
   const now = new Date();

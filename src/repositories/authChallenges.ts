@@ -90,11 +90,7 @@ export function createPgAuthChallengesRepo(db: Db): AuthChallengesRepo {
     },
 
     async findById(id) {
-      const rows = await db
-        .select()
-        .from(authChallenges)
-        .where(eq(authChallenges.id, id))
-        .limit(1);
+      const rows = await db.select().from(authChallenges).where(eq(authChallenges.id, id)).limit(1);
       const r = rows[0];
       return r ? rowToChallenge(r) : null;
     },

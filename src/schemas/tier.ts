@@ -39,11 +39,7 @@ export const tierOverrideRequestSchema = {
     tier: { type: 'string', enum: ['tier_0', 'tier_1', 'tier_2'] },
     reason: {
       type: 'string',
-      enum: [
-        'operator_tier_2_approval',
-        'operator_demotion_kyc_lapse',
-        'operator_demotion_aml',
-      ],
+      enum: ['operator_tier_2_approval', 'operator_demotion_kyc_lapse', 'operator_demotion_aml'],
     },
     narrative: { type: 'string', maxLength: 500 },
   },

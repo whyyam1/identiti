@@ -2,10 +2,7 @@
  * In-memory DelegatedAuthoritySigningsRepo for tests.
  */
 
-import type {
-  DelegatedAuthoritySigningInsert,
-  DelegatedAuthoritySigningsRepo,
-} from './types.js';
+import type { DelegatedAuthoritySigningInsert, DelegatedAuthoritySigningsRepo } from './types.js';
 
 export function createMemoryDelegatedAuthoritySigningsRepo(): DelegatedAuthoritySigningsRepo & {
   list: () => readonly DelegatedAuthoritySigningInsert[];

@@ -10,12 +10,7 @@
  *   Decryption is rail-internal only (Phase 6 phone-token resolution).
  */
 
-import {
-  createCipheriv,
-  createDecipheriv,
-  pbkdf2Sync,
-  randomBytes,
-} from 'node:crypto';
+import { createCipheriv, createDecipheriv, pbkdf2Sync, randomBytes } from 'node:crypto';
 
 const PBKDF2_ITERATIONS = 100_000;
 const PBKDF2_KEYLEN = 32;
@@ -37,9 +32,7 @@ export interface PhoneCrypto {
 function decodeKey(keyHex: string): Buffer {
   const buf = Buffer.from(keyHex, 'hex');
   if (buf.length !== AES_KEY_LEN) {
-    throw new Error(
-      `PHONE_ENCRYPTION_KEY must decode to ${AES_KEY_LEN} bytes; got ${buf.length}`
-    );
+    throw new Error(`PHONE_ENCRYPTION_KEY must decode to ${AES_KEY_LEN} bytes; got ${buf.length}`);
   }
   return buf;
 }
@@ -58,17 +51,14 @@ export function createPhoneCrypto(cfg: PhoneCryptoConfig): PhoneCrypto {
         salt,
         PBKDF2_ITERATIONS,
         PBKDF2_KEYLEN,
-        'sha256'
+        'sha256',
       ).toString('hex');
     },
 
     encrypt(normalisedMsisdn) {
       const iv = randomBytes(AES_IV_LEN);
       const cipher = createCipheriv('aes-256-gcm', key, iv);
-      const ct = Buffer.concat([
-        cipher.update(normalisedMsisdn, 'utf8'),
-        cipher.final(),
-      ]);
+      const ct = Buffer.concat([cipher.update(normalisedMsisdn, 'utf8'), cipher.final()]);
       const tag = cipher.getAuthTag();
       return Buffer.concat([iv, tag, ct]).toString('base64');
     },

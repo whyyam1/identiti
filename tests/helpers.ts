@@ -79,11 +79,7 @@ export function makeMemCredStore(opts: { suspended?: boolean } = {}): AppCredent
             app_id: TEST_OPERATOR_APP_ID,
             app_name: 'Test operator console',
             tenant_class: 'internal',
-            scopes: [
-              'identiti:operator',
-              'identiti:customers:read',
-              'identiti:tier:read',
-            ],
+            scopes: ['identiti:operator', 'identiti:customers:read', 'identiti:tier:read'],
             status: 'active',
           },
           hmacSecret: TEST_OPERATOR_HMAC_SECRET,

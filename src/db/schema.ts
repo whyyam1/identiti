@@ -49,7 +49,7 @@ export const idempotencyKeys = pgTable(
   (t) => ({
     pk: primaryKey({ columns: [t.key, t.appId] }),
     expiresAtIdx: index('idempotency_keys_expires_at_idx').on(t.expiresAt),
-  })
+  }),
 );
 
 export const auditLog = pgTable(
@@ -73,12 +73,8 @@ export const auditLog = pgTable(
   },
   (t) => ({
     appCreatedIdx: index('audit_log_app_id_created_at_idx').on(t.appId, t.createdAt),
-    resourceIdx: index('audit_log_resource_idx').on(
-      t.resourceType,
-      t.resourceId,
-      t.createdAt
-    ),
-  })
+    resourceIdx: index('audit_log_resource_idx').on(t.resourceType, t.resourceId, t.createdAt),
+  }),
 );
 
 // ─── Phase 2 (Sprint 1) — accounts and phone records ──────────────────────
@@ -110,9 +106,9 @@ export const platformAccounts = pgTable(
     originAppIdx: index('platform_accounts_origin_app_idx').on(t.originAppId),
     correlationIdx: index('platform_accounts_app_correlation_idx').on(
       t.originAppId,
-      t.appCorrelation
+      t.appCorrelation,
     ),
-  })
+  }),
 );
 
 export const phoneRecords = pgTable(
@@ -128,7 +124,7 @@ export const phoneRecords = pgTable(
   },
   (t) => ({
     phoneHashIdx: index('phone_records_phone_hash_idx').on(t.phoneHash),
-  })
+  }),
 );
 
 // ─── Sprint 2 (Phase 3) — auth challenges and sessions ────────────────────
@@ -166,9 +162,9 @@ export const authChallenges = pgTable(
     accountStatusIdx: index('auth_challenges_account_status_idx').on(
       t.accountId,
       t.status,
-      t.expiresAt
+      t.expiresAt,
     ),
-  })
+  }),
 );
 
 export const sessions = pgTable(
@@ -187,7 +183,7 @@ export const sessions = pgTable(
   (t) => ({
     accountIdx: index('sessions_account_idx').on(t.accountId, t.expiresAt),
     jtiIdx: index('sessions_jti_idx').on(t.jti),
-  })
+  }),
 );
 
 // ─── Sprint 6 (Phase 4) — KYC artefacts ───────────────────────────────────
@@ -220,9 +216,9 @@ export const kycRecords = pgTable(
     accountKindStatusIdx: index('kyc_records_account_kind_status_idx').on(
       t.accountId,
       t.kind,
-      t.status
+      t.status,
     ),
-  })
+  }),
 );
 
 // ─── Sprint 5 (Phase 6) — phone-token issuance ledger ────────────────────
@@ -244,9 +240,9 @@ export const phoneTokens = pgTable(
     accountActiveIdx: index('phone_tokens_account_active_idx').on(
       t.accountUuid,
       t.revoked,
-      t.expiresAt
+      t.expiresAt,
     ),
-  })
+  }),
 );
 
 // ─── Sprint 4 (Phase 5) — step-up token issuance ledger ───────────────────
@@ -274,9 +270,9 @@ export const stepUpTokens = pgTable(
   (t) => ({
     accountExpIdx: index('step_up_tokens_account_exp_idx').on(t.accountUuid, t.exp),
     delegatedAuthorityIdx: index('step_up_tokens_delegated_authority_idx').on(
-      t.delegatedAuthorityJti
+      t.delegatedAuthorityJti,
     ),
-  })
+  }),
 );
 
 // ─── ID-10 — delegated-authority signing ledger ───────────────────────────
@@ -300,11 +296,11 @@ export const delegatedAuthoritySignings = pgTable(
   (t) => ({
     accountSignedIdx: index('delegated_authority_signings_account_signed_idx').on(
       t.accountUuid,
-      t.signedAt
+      t.signedAt,
     ),
     stepUpIdx: index('delegated_authority_signings_step_up_idx').on(t.stepUpJti),
     agentIdx: index('delegated_authority_signings_agent_idx').on(t.agentId),
-  })
+  }),
 );
 
 // ─── Sprint 7 (Phase 7) — phone-change ledger ────────────────────────────
@@ -330,10 +326,6 @@ export const phoneChanges = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    accountStateIdx: index('phone_changes_account_state_idx').on(
-      t.accountId,
-      t.state,
-      t.expiresAt
-    ),
-  })
+    accountStateIdx: index('phone_changes_account_state_idx').on(t.accountId, t.state, t.expiresAt),
+  }),
 );

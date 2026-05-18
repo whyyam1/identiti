@@ -7,12 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildCanonicalString, sha256Hex, signRequest } from '@kmv/platform-shared/hmac';
 import { buildApp, type App } from '../src/app.js';
-import {
-  makeTestDeps,
-  TEST_APP_ID,
-  TEST_HMAC_SECRET,
-  type TestDepsBundle,
-} from './helpers.js';
+import { makeTestDeps, TEST_APP_ID, TEST_HMAC_SECRET, type TestDepsBundle } from './helpers.js';
 import { createMemoryCustomersRepo } from '../src/repositories/customers.memory.js';
 import { makeMemCredStore } from './helpers.js';
 
@@ -91,7 +86,7 @@ describe('POST /v1/customers', () => {
     const env = res.json();
     expect(env.ok).toBe(true);
     expect(env.data.account_uuid).toMatch(
-      /^acc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+      /^acc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
     expect(env.data.state).toBe('pending_onboarding');
     expect(env.data.tier).toBe('tier_0');
@@ -224,7 +219,7 @@ describe('POST /v1/customers', () => {
           kyc_consent: true,
           captured_at: new Date().toISOString(),
         },
-      })
+      }),
     );
     const res = await app.inject({
       method: 'POST',

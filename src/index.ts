@@ -59,7 +59,7 @@ async function main(): Promise<void> {
   // Reboot Pack §7 ID-D-06 closes.
   if (!env.IPRS_STUB_MODE && env.NODE_ENV === 'production') {
     throw new Error(
-      'IPRS_STUB_MODE=false in production but no real IPRS adapter is wired (Reboot Pack §7 ID-D-06)'
+      'IPRS_STUB_MODE=false in production but no real IPRS adapter is wired (Reboot Pack §7 ID-D-06)',
     );
   }
   const iprsService = createStubIprsService();
@@ -100,7 +100,7 @@ async function main(): Promise<void> {
   const phoneTokenSigningKey = Buffer.from(env.PHONE_TOKEN_SIGNING_KEY, 'hex');
   if (phoneTokenSigningKey.length < 32) {
     throw new Error(
-      `PHONE_TOKEN_SIGNING_KEY must decode to >= 32 bytes; got ${phoneTokenSigningKey.length}`
+      `PHONE_TOKEN_SIGNING_KEY must decode to >= 32 bytes; got ${phoneTokenSigningKey.length}`,
     );
   }
   const phoneTokenSigner = createPhoneTokenSigner({
@@ -124,7 +124,7 @@ async function main(): Promise<void> {
     });
   } else {
     logger.warn(
-      'KAFKA_BROKERS empty — using in-memory event producer. Events will not propagate cross-rail. Acceptable for dev only.'
+      'KAFKA_BROKERS empty — using in-memory event producer. Events will not propagate cross-rail. Acceptable for dev only.',
     );
     eventProducer = new InMemoryEventProducer();
   }
@@ -163,7 +163,7 @@ async function main(): Promise<void> {
         step_up_kid: jwtKeyPair.kid,
         delegated_authority_kid: daKeyPair.kid,
       },
-      'Identiti API listening'
+      'Identiti API listening',
     );
   } catch (err) {
     logger.error({ err }, 'failed to start server');

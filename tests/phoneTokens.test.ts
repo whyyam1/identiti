@@ -89,12 +89,10 @@ async function createCustomer(app: App, phone: string): Promise<string> {
 async function issuePhoneToken(
   app: App,
   account: string,
-  audience?: 'todoku'
+  audience?: 'todoku',
 ): Promise<{ phone_token: string; jti: string; expires_at: string }> {
   const body = JSON.stringify(
-    audience !== undefined
-      ? { account_uuid: account, audience }
-      : { account_uuid: account }
+    audience !== undefined ? { account_uuid: account, audience } : { account_uuid: account },
   );
   const r = await app.inject({
     method: 'POST',
@@ -517,7 +515,7 @@ describe('Customer-token JWT phone_token claim (Schema Appendix §2.7)', () => {
     });
     const challengeId = c.json().data.challenge_id as string;
     const event = deps.eventProducer.events.find(
-      (e) => e.type === 'AUTH_CHALLENGE_REQUIRED' && e.data.challenge_id === challengeId
+      (e) => e.type === 'AUTH_CHALLENGE_REQUIRED' && e.data.challenge_id === challengeId,
     );
     const otp = event!.data.otp_plaintext as string;
 

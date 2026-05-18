@@ -70,11 +70,7 @@ export function createPgPhoneChangesRepo(db: Db): PhoneChangesRepo {
       return rowToChange(row);
     },
     async findById(id) {
-      const rows = await db
-        .select()
-        .from(phoneChanges)
-        .where(eq(phoneChanges.id, id))
-        .limit(1);
+      const rows = await db.select().from(phoneChanges).where(eq(phoneChanges.id, id)).limit(1);
       const r = rows[0];
       return r ? rowToChange(r) : null;
     },
@@ -85,8 +81,8 @@ export function createPgPhoneChangesRepo(db: Db): PhoneChangesRepo {
         .where(
           and(
             eq(phoneChanges.accountId, accountId),
-            inArray(phoneChanges.state, ['initiated', 'cooldown_active'])
-          )
+            inArray(phoneChanges.state, ['initiated', 'cooldown_active']),
+          ),
         )
         .limit(1);
       const r = rows[0];
@@ -116,8 +112,8 @@ export function createPgPhoneChangesRepo(db: Db): PhoneChangesRepo {
         .where(
           and(
             eq(phoneChanges.id, id),
-            inArray(phoneChanges.state, ['initiated', 'cooldown_active'])
-          )
+            inArray(phoneChanges.state, ['initiated', 'cooldown_active']),
+          ),
         )
         .returning();
       return row ? rowToChange(row) : null;

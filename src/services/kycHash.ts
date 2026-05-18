@@ -24,13 +24,9 @@ export function createKycHasher(saltHex: string): KycHasher {
   }
   return {
     hashNationalId(nationalId) {
-      return pbkdf2Sync(
-        nationalId,
-        salt,
-        PBKDF2_ITERATIONS,
-        PBKDF2_KEYLEN,
-        'sha256'
-      ).toString('hex');
+      return pbkdf2Sync(nationalId, salt, PBKDF2_ITERATIONS, PBKDF2_KEYLEN, 'sha256').toString(
+        'hex',
+      );
     },
   };
 }

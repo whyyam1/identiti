@@ -14,12 +14,7 @@ import { buildCanonicalString, sha256Hex, signRequest } from '@kmv/platform-shar
 import { buildApp, type App } from '../src/app.js';
 import { buildJwks } from '../src/services/jwtKeys.js';
 import { STEPUP_TTL_BY_RISK } from '../src/schemas/stepup.js';
-import {
-  makeTestDeps,
-  TEST_APP_ID,
-  TEST_HMAC_SECRET,
-  type TestDepsBundle,
-} from './helpers.js';
+import { makeTestDeps, TEST_APP_ID, TEST_HMAC_SECRET, type TestDepsBundle } from './helpers.js';
 
 const KP_AUDIENCE = 'https://api.pay.kipkiren.com';
 const ISSUER = 'https://api.id.identiti.co.ke';
@@ -53,7 +48,7 @@ function signed(opts: {
 async function createActiveCustomer(
   app: App,
   deps: TestDepsBundle,
-  phone: string
+  phone: string,
 ): Promise<string> {
   const body = JSON.stringify({
     phone,
@@ -88,7 +83,7 @@ async function initiateStepup(
     operation_risk_tier: 'low' | 'medium' | 'high' | 'very_high';
     operation_audience: string;
     factor: 'phone_otp' | 'hardware_key' | 'passive_biometric';
-  }> = {}
+  }> = {},
 ) {
   const body = JSON.stringify({
     account_uuid: account,
@@ -151,11 +146,9 @@ describe('POST /v1/stepup/challenges', () => {
       factor: 'phone_otp',
     });
     expect(typeof event.data.otp_plaintext).toBe('string');
-    expect((event.data.otp_plaintext as string)).toMatch(/^[0-9]{6}$/);
+    expect(event.data.otp_plaintext as string).toMatch(/^[0-9]{6}$/);
 
-    expect(deps.auditLogger.entries.some((e) => e.action === 'stepup.challenge.create')).toBe(
-      true
-    );
+    expect(deps.auditLogger.entries.some((e) => e.action === 'stepup.challenge.create')).toBe(true);
   });
 
   it('rejects malformed account_uuid', async () => {
@@ -306,7 +299,7 @@ describe('POST /v1/stepup/verify', () => {
 
   async function runStepupChallenge(
     phone: string,
-    riskTier: 'low' | 'medium' | 'high' | 'very_high' = 'medium'
+    riskTier: 'low' | 'medium' | 'high' | 'very_high' = 'medium',
   ): Promise<{
     accountUuid: string;
     challengeId: string;
@@ -317,7 +310,7 @@ describe('POST /v1/stepup/verify', () => {
     if (r.statusCode !== 201) throw new Error(`initiate failed: ${r.statusCode} ${r.body}`);
     const challengeId = r.json().data.challenge_id as string;
     const event = deps.eventProducer.events.find(
-      (e) => e.type === 'STEP_UP_REQUIRED' && e.data.challenge_id === challengeId
+      (e) => e.type === 'STEP_UP_REQUIRED' && e.data.challenge_id === challengeId,
     );
     if (!event) throw new Error('expected STEP_UP_REQUIRED event');
     return { accountUuid, challengeId, otp: event.data.otp_plaintext as string };
@@ -365,9 +358,9 @@ describe('POST /v1/stepup/verify', () => {
     // nbf must equal iat (no negative time-skew window).
     expect(verified.payload.nbf).toBe(verified.payload.iat);
     // exp - iat must equal the risk-tier TTL.
-    expect(
-      (verified.payload.exp as number) - (verified.payload.iat as number)
-    ).toBe(STEPUP_TTL_BY_RISK.medium);
+    expect((verified.payload.exp as number) - (verified.payload.iat as number)).toBe(
+      STEPUP_TTL_BY_RISK.medium,
+    );
 
     // Persisted in step_up_tokens.
     const persisted = await deps.stepUpTokensRepo.findByJti(challengeId);
@@ -387,7 +380,7 @@ describe('POST /v1/stepup/verify', () => {
   ])('honours risk-tier TTL for %s', async (tier, ttl) => {
     const { challengeId, otp } = await runStepupChallenge(
       `+25471234710${tier === 'low' ? 0 : tier === 'medium' ? 1 : tier === 'high' ? 2 : 3}`,
-      tier
+      tier,
     );
     const body = JSON.stringify({ challenge_id: challengeId, response: otp });
     const res = await app.inject({

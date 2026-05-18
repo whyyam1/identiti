@@ -2,11 +2,7 @@
  * In-memory PhoneTokensRepo for tests.
  */
 
-import type {
-  PhoneTokenInsert,
-  PhoneTokenRecord,
-  PhoneTokensRepo,
-} from './types.js';
+import type { PhoneTokenInsert, PhoneTokenRecord, PhoneTokensRepo } from './types.js';
 
 export function createMemoryPhoneTokensRepo(): PhoneTokensRepo & {
   list: () => readonly PhoneTokenRecord[];

@@ -33,7 +33,7 @@ export function tierRoutes(deps: TierRouteDeps): FastifyPluginAsync {
           return reply.code(400).send(
             errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
               field: 'uuid',
-            })
+            }),
           );
         }
         const tier = await deps.customersRepo.getTier(uuid);
@@ -49,14 +49,14 @@ export function tierRoutes(deps: TierRouteDeps): FastifyPluginAsync {
         };
         if (tier.tier === 'tier_2') {
           data.next_review_at = new Date(
-            tier.assignedAt.getTime() + TIER_2_REVIEW_INTERVAL_MS
+            tier.assignedAt.getTime() + TIER_2_REVIEW_INTERVAL_MS,
           ).toISOString();
         }
         return reply
           .code(200)
           .header('cache-control', 'private, max-age=60')
           .send(successResponse(data, rid));
-      }
+      },
     );
   };
 }

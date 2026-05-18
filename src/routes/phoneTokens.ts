@@ -21,11 +21,7 @@ import {
   resolvePhoneTokenRequestSchema,
   revokePhoneTokenRequestSchema,
 } from '../schemas/phoneTokens.js';
-import type {
-  CustomersRepo,
-  PhoneTokenAudience,
-  PhoneTokensRepo,
-} from '../repositories/types.js';
+import type { CustomersRepo, PhoneTokenAudience, PhoneTokensRepo } from '../repositories/types.js';
 import type { AuditLogger } from '../services/auditLogger.js';
 import type { PhoneTokenSigner } from '../services/phoneTokenSigner.js';
 import { requireScope } from '../plugins/scope.js';
@@ -57,9 +53,7 @@ export interface PhoneTokensRouteDeps {
   auditLogger: AuditLogger;
 }
 
-export function phoneTokensRoutes(
-  deps: PhoneTokensRouteDeps
-): FastifyPluginAsync {
+export function phoneTokensRoutes(deps: PhoneTokensRouteDeps): FastifyPluginAsync {
   return async (fastify) => {
     fastify.post(
       '/v1/phone-tokens',
@@ -69,14 +63,16 @@ export function phoneTokensRoutes(
         const appId = request.appId!;
 
         if (!validateIssue(request.body)) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_request_invalid',
-              'Request body does not match schema',
-              rid,
-              { detail: { errors: validateIssue.errors ?? [] } }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_request_invalid',
+                'Request body does not match schema',
+                rid,
+                { detail: { errors: validateIssue.errors ?? [] } },
+              ),
+            );
         }
         const data = request.body as IssueBody;
         const audience = data.audience ?? DEFAULT_AUDIENCE;
@@ -124,10 +120,10 @@ export function phoneTokensRoutes(
               audience,
               expires_at: signed.expiresAt.toISOString(),
             },
-            rid
-          )
+            rid,
+          ),
         );
-      }
+      },
     );
 
     fastify.post(
@@ -138,14 +134,16 @@ export function phoneTokensRoutes(
         const appId = request.appId!;
 
         if (!validateResolve(request.body)) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_request_invalid',
-              'Request body does not match schema',
-              rid,
-              { detail: { errors: validateResolve.errors ?? [] } }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_request_invalid',
+                'Request body does not match schema',
+                rid,
+                { detail: { errors: validateResolve.errors ?? [] } },
+              ),
+            );
         }
         const data = request.body as ResolveBody;
         const expected = data.expected_audience ?? DEFAULT_AUDIENCE;
@@ -161,8 +159,8 @@ export function phoneTokensRoutes(
               errorResponse(
                 'phone_token_invalid',
                 'Token signature, issuer, or audience invalid',
-                rid
-              )
+                rid,
+              ),
             );
         }
 
@@ -179,9 +177,7 @@ export function phoneTokensRoutes(
         // audience.
         const record = await deps.phoneTokensRepo.findByJti(jti);
         if (!record) {
-          return reply
-            .code(401)
-            .send(errorResponse('phone_token_invalid', 'Unknown jti', rid));
+          return reply.code(401).send(errorResponse('phone_token_invalid', 'Unknown jti', rid));
         }
         if (record.audience !== expected) {
           return reply
@@ -190,8 +186,8 @@ export function phoneTokensRoutes(
               errorResponse(
                 'phone_token_audience_mismatch',
                 `Token issued for audience ${record.audience}, not ${expected}`,
-                rid
-              )
+                rid,
+              ),
             );
         }
         if (record.revoked) {
@@ -213,11 +209,7 @@ export function phoneTokensRoutes(
           return reply
             .code(404)
             .send(
-              errorResponse(
-                'phone_record_not_found',
-                'No phone record for the bound account',
-                rid
-              )
+              errorResponse('phone_record_not_found', 'No phone record for the bound account', rid),
             );
         }
 
@@ -241,10 +233,10 @@ export function phoneTokensRoutes(
               phone_encrypted: phone,
               encrypted_format: 'aes-256-gcm-v1' as const,
             },
-            rid
-          )
+            rid,
+          ),
         );
-      }
+      },
     );
 
     fastify.post<{ Params: { jti: string } }>(
@@ -259,18 +251,20 @@ export function phoneTokensRoutes(
           return reply.code(400).send(
             errorResponse('validation_request_invalid', 'Token jti is malformed', rid, {
               field: 'jti',
-            })
+            }),
           );
         }
         if (!validateRevoke(request.body)) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_request_invalid',
-              'Request body does not match schema',
-              rid,
-              { detail: { errors: validateRevoke.errors ?? [] } }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_request_invalid',
+                'Request body does not match schema',
+                rid,
+                { detail: { errors: validateRevoke.errors ?? [] } },
+              ),
+            );
         }
         const data = request.body as RevokeBody;
 
@@ -279,9 +273,7 @@ export function phoneTokensRoutes(
           // Either jti unknown or already revoked.
           const existing = await deps.phoneTokensRepo.findByJti(jti);
           if (!existing) {
-            return reply
-              .code(404)
-              .send(errorResponse('phone_token_not_found', 'Unknown jti', rid));
+            return reply.code(404).send(errorResponse('phone_token_not_found', 'Unknown jti', rid));
           }
           // Already revoked → idempotent success.
           return reply.code(200).send(
@@ -291,8 +283,8 @@ export function phoneTokensRoutes(
                 revoked_at: existing.revokedAt!.toISOString(),
                 reason: existing.revokeReason ?? data.reason,
               },
-              rid
-            )
+              rid,
+            ),
           );
         }
 
@@ -316,10 +308,10 @@ export function phoneTokensRoutes(
               revoked_at: updated.revokedAt!.toISOString(),
               reason: data.reason,
             },
-            rid
-          )
+            rid,
+          ),
         );
-      }
+      },
     );
   };
 }

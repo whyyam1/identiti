@@ -8,7 +8,8 @@
  * `canonical_docs_location.md` authority order.
  */
 
-const ACCOUNT_UUID_PATTERN = '^acc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$';
+const ACCOUNT_UUID_PATTERN =
+  '^acc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$';
 const CHALLENGE_ID_PATTERN = '^stp_[0-9A-HJKMNP-TV-Z]{26}$';
 const AGENT_ID_PATTERN = '^agt_[0-9A-HJKMNP-TV-Z]{26}$';
 const DA_JTI_PATTERN = '^daa_[0-9A-HJKMNP-TV-Z]{26}$';
@@ -108,10 +109,7 @@ export const verifyStepupRequestSchema = {
   properties: {
     challenge_id: { type: 'string', pattern: CHALLENGE_ID_PATTERN },
     response: {
-      oneOf: [
-        { type: 'string', pattern: '^[0-9]{6}$' },
-        { type: 'object' },
-      ],
+      oneOf: [{ type: 'string', pattern: '^[0-9]{6}$' }, { type: 'object' }],
     },
     client_device: { type: 'object' },
   },
@@ -133,7 +131,7 @@ export const verifyStepupResponseSchema = {
  * (60 minimum, 600 maximum) and Scaffold §14.3 ("default 300; can be 60 for
  * very-high-risk operations"). Lower risk = longer freshness window.
  */
-export const STEPUP_TTL_BY_RISK: Record<typeof RISK_TIER_ENUM[number], number> = {
+export const STEPUP_TTL_BY_RISK: Record<(typeof RISK_TIER_ENUM)[number], number> = {
   low: 600,
   medium: 300,
   high: 180,

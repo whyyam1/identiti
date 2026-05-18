@@ -134,7 +134,9 @@ describe('POST /v1/operator/customers/{uuid}/suspend', () => {
     });
 
     const newAudit = deps.auditLogger.entries.slice(auditCountBefore);
-    expect(newAudit.some((e) => e.action === 'operator.customer.suspend' && e.outcome === 'success')).toBe(true);
+    expect(
+      newAudit.some((e) => e.action === 'operator.customer.suspend' && e.outcome === 'success'),
+    ).toBe(true);
   });
 
   it('rejects when scope identiti:operator is missing (regular app)', async () => {

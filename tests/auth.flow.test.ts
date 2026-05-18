@@ -9,12 +9,7 @@ import { jwtVerify, createLocalJWKSet } from 'jose';
 import { buildCanonicalString, sha256Hex, signRequest } from '@kmv/platform-shared/hmac';
 import { buildApp, type App } from '../src/app.js';
 import { buildJwks } from '../src/services/jwtKeys.js';
-import {
-  makeTestDeps,
-  TEST_APP_ID,
-  TEST_HMAC_SECRET,
-  type TestDepsBundle,
-} from './helpers.js';
+import { makeTestDeps, TEST_APP_ID, TEST_HMAC_SECRET, type TestDepsBundle } from './helpers.js';
 
 function signed(opts: {
   method: string;

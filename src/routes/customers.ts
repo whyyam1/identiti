@@ -12,9 +12,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { errorResponse, generateUlid, successResponse } from '@kmv/platform-shared';
 import { createAjv } from '../lib/ajv.js';
-import {
-  createCustomerRequestSchema,
-} from '../schemas/customers.js';
+import { createCustomerRequestSchema } from '../schemas/customers.js';
 import { generateAccountUuid, isAccountUuid } from '../domain/accountUuid.js';
 import { normalisePhone } from '../domain/phoneNormalise.js';
 import type { CustomersRepo } from '../repositories/types.js';
@@ -70,8 +68,8 @@ export function customersRoutes(deps: CustomersRouteDeps): FastifyPluginAsync {
                 'validation_request_invalid',
                 'Request body does not match schema',
                 rid,
-                { detail: { errors: validateCreateBody.errors ?? [] } }
-              )
+                { detail: { errors: validateCreateBody.errors ?? [] } },
+              ),
             );
         }
         const data = request.body as CreateBody;
@@ -84,8 +82,8 @@ export function customersRoutes(deps: CustomersRouteDeps): FastifyPluginAsync {
                 'validation_consent_missing',
                 'Both dpa_consent and kyc_consent must be true',
                 rid,
-                { field: 'consent' }
-              )
+                { field: 'consent' },
+              ),
             );
         }
 
@@ -98,8 +96,8 @@ export function customersRoutes(deps: CustomersRouteDeps): FastifyPluginAsync {
                 'validation_phone_invalid',
                 'Phone is not a valid Kenyan E.164 MSISDN',
                 rid,
-                { field: 'phone' }
-              )
+                { field: 'phone' },
+              ),
             );
         }
 
@@ -146,8 +144,8 @@ export function customersRoutes(deps: CustomersRouteDeps): FastifyPluginAsync {
                 'validation_phone_already_registered',
                 'Phone is already registered to another account',
                 rid,
-                { field: 'phone' }
-              )
+                { field: 'phone' },
+              ),
             );
         }
 
@@ -186,10 +184,10 @@ export function customersRoutes(deps: CustomersRouteDeps): FastifyPluginAsync {
               tier: result.outcome.tier,
               created_at: result.outcome.createdAt.toISOString(),
             },
-            rid
-          )
+            rid,
+          ),
         );
-      }
+      },
     );
 
     fastify.get<{ Params: { uuid: string } }>(
@@ -199,16 +197,11 @@ export function customersRoutes(deps: CustomersRouteDeps): FastifyPluginAsync {
         const rid = request.requestId;
         const { uuid } = request.params;
         if (!isAccountUuid(uuid)) {
-          return reply
-            .code(400)
-            .send(
-              errorResponse(
-                'validation_account_uuid_invalid',
-                'Account UUID is malformed',
-                rid,
-                { field: 'uuid' }
-              )
-            );
+          return reply.code(400).send(
+            errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
+              field: 'uuid',
+            }),
+          );
         }
 
         const row = await deps.customersRepo.findById(uuid);
@@ -237,7 +230,7 @@ export function customersRoutes(deps: CustomersRouteDeps): FastifyPluginAsync {
         }
 
         return reply.code(200).send(successResponse(responseData, rid));
-      }
+      },
     );
   };
 }

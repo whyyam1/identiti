@@ -121,7 +121,7 @@ function loadKafka(nodeEnv: NodeEnv): {
       sasl = { mechanism: 'scram-sha-512', username, password };
     } else {
       throw new Error(
-        `KAFKA_SASL_MECHANISM must be plain|scram-sha-256|scram-sha-512; got ${saslMechRaw}`
+        `KAFKA_SASL_MECHANISM must be plain|scram-sha-256|scram-sha-512; got ${saslMechRaw}`,
       );
     }
   }
@@ -141,11 +141,11 @@ export function loadEnv(): Env {
     DATABASE_URL: required('DATABASE_URL'),
     AUTH_HMAC_TOLERANCE_SECONDS: asInt(
       'AUTH_HMAC_TOLERANCE_SECONDS',
-      optional('AUTH_HMAC_TOLERANCE_SECONDS', '300')
+      optional('AUTH_HMAC_TOLERANCE_SECONDS', '300'),
     ),
     IDEMPOTENCY_TTL_SECONDS: asInt(
       'IDEMPOTENCY_TTL_SECONDS',
-      optional('IDEMPOTENCY_TTL_SECONDS', '86400')
+      optional('IDEMPOTENCY_TTL_SECONDS', '86400'),
     ),
     PHONE_ENCRYPTION_KEY: required('PHONE_ENCRYPTION_KEY'),
     PHONE_HASH_SALT: required('PHONE_HASH_SALT'),

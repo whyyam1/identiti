@@ -82,14 +82,16 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
         const appId = request.appId!;
 
         if (!validateInitiate(request.body)) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_request_invalid',
-              'Request body does not match schema',
-              rid,
-              { detail: { errors: validateInitiate.errors ?? [] } }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_request_invalid',
+                'Request body does not match schema',
+                rid,
+                { detail: { errors: validateInitiate.errors ?? [] } },
+              ),
+            );
         }
         const data = request.body as InitiateBody;
 
@@ -97,21 +99,23 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
           return reply.code(400).send(
             errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
               field: 'account_uuid',
-            })
+            }),
           );
         }
 
         // v1.0 only wires phone_otp end-to-end. hardware_key and
         // passive_biometric require Phase 5+ adapters; reject up-front.
         if (data.factor !== 'phone_otp') {
-          return reply.code(400).send(
-            errorResponse(
-              'auth_factor_unsupported',
-              `Factor ${data.factor} is not supported in this phase`,
-              rid,
-              { field: 'factor' }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'auth_factor_unsupported',
+                `Factor ${data.factor} is not supported in this phase`,
+                rid,
+                { field: 'factor' },
+              ),
+            );
         }
 
         const account = await deps.customersRepo.findById(data.account_uuid);
@@ -133,8 +137,8 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
                   current_state: account.state,
                   required_state: 'active',
                 },
-              }
-            )
+              },
+            ),
           );
         }
 
@@ -240,10 +244,10 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
               expires_at: expiresAt.toISOString(),
               delivery_status: 'dispatched' as const,
             },
-            rid
-          )
+            rid,
+          ),
         );
-      }
+      },
     );
 
     fastify.post('/v1/stepup/verify', async (request, reply) => {
@@ -252,12 +256,9 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
 
       if (!validateVerify(request.body)) {
         return reply.code(400).send(
-          errorResponse(
-            'validation_request_invalid',
-            'Request body does not match schema',
-            rid,
-            { detail: { errors: validateVerify.errors ?? [] } }
-          )
+          errorResponse('validation_request_invalid', 'Request body does not match schema', rid, {
+            detail: { errors: validateVerify.errors ?? [] },
+          }),
         );
       }
       const data = request.body as VerifyBody;
@@ -267,7 +268,7 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
         return reply.code(401).send(
           errorResponse('auth_factor_failed', 'Challenge is no longer usable', rid, {
             detail: { challenge_id: data.challenge_id, attempts_remaining: 0 },
-          })
+          }),
         );
       }
       // /v1/stepup/verify ONLY consumes purpose='stepup' challenges; a login
@@ -276,14 +277,14 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
         return reply.code(401).send(
           errorResponse('auth_factor_failed', 'Wrong challenge purpose for this endpoint', rid, {
             detail: { challenge_id: challenge.id, attempts_remaining: 0 },
-          })
+          }),
         );
       }
       if (challenge.status !== 'pending') {
         return reply.code(401).send(
           errorResponse('auth_factor_failed', `Challenge is ${challenge.status}`, rid, {
             detail: { challenge_id: challenge.id, attempts_remaining: 0 },
-          })
+          }),
         );
       }
       if (challenge.expiresAt.getTime() <= Date.now()) {
@@ -298,18 +299,20 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
               challenge_id: challenge.id,
               expired_at: challenge.expiresAt.toISOString(),
             },
-          })
+          }),
         );
       }
       if (typeof data.response !== 'string') {
-        return reply.code(400).send(
-          errorResponse(
-            'auth_factor_unsupported',
-            'Only phone_otp string responses are accepted in this phase',
-            rid,
-            { field: 'response' }
-          )
-        );
+        return reply
+          .code(400)
+          .send(
+            errorResponse(
+              'auth_factor_unsupported',
+              'Only phone_otp string responses are accepted in this phase',
+              rid,
+              { field: 'response' },
+            ),
+          );
       }
       if (!challenge.otpHash) {
         return reply
@@ -339,14 +342,16 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
             outcome: 'failure',
             detail: { attempts: newAttempts },
           });
-          return reply.code(401).send(
-            errorResponse(
-              'auth_factor_failed',
-              'Too many failed attempts; challenge is now invalid',
-              rid,
-              { detail: { challenge_id: challenge.id, attempts_remaining: 0 } }
-            )
-          );
+          return reply
+            .code(401)
+            .send(
+              errorResponse(
+                'auth_factor_failed',
+                'Too many failed attempts; challenge is now invalid',
+                rid,
+                { detail: { challenge_id: challenge.id, attempts_remaining: 0 } },
+              ),
+            );
         }
         await deps.challengesRepo.recordAttempt(challenge.id, {
           status: 'pending',
@@ -356,7 +361,7 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
         return reply.code(401).send(
           errorResponse('auth_factor_failed', 'Invalid OTP', rid, {
             detail: { challenge_id: challenge.id, attempts_remaining: attemptsRemaining },
-          })
+          }),
         );
       }
 
@@ -375,13 +380,15 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
         // challenge was created via /v1/auth/challenges with purpose='stepup'
         // — that path is rejected at /v1/auth/customer-token but we cannot
         // mint a step-up token from it either.
-        return reply.code(500).send(
-          errorResponse(
-            'INTERNAL_UNSPECIFIED',
-            'Challenge missing step-up binding (intended_operation, operation_audience, operation_risk_tier)',
-            rid
-          )
-        );
+        return reply
+          .code(500)
+          .send(
+            errorResponse(
+              'INTERNAL_UNSPECIFIED',
+              'Challenge missing step-up binding (intended_operation, operation_audience, operation_risk_tier)',
+              rid,
+            ),
+          );
       }
 
       await deps.challengesRepo.recordAttempt(challenge.id, {
@@ -445,8 +452,8 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
             stepup_token: signed.token,
             expires_in: expiresInSeconds,
           },
-          rid
-        )
+          rid,
+        ),
       );
     });
   };

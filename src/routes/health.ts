@@ -20,7 +20,7 @@ export function healthRoutes(env: Env): FastifyPluginAsync {
           version: env.RAIL_VERSION,
           environment: env.NODE_ENV,
         },
-        request.requestId
+        request.requestId,
       );
     });
   };

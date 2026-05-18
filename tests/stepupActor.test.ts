@@ -18,12 +18,7 @@ import { generateUlid } from '@kmv/platform-shared';
 import { buildCanonicalString, sha256Hex, signRequest } from '@kmv/platform-shared/hmac';
 import { buildApp, type App } from '../src/app.js';
 import { buildJwks } from '../src/services/jwtKeys.js';
-import {
-  makeTestDeps,
-  TEST_APP_ID,
-  TEST_HMAC_SECRET,
-  type TestDepsBundle,
-} from './helpers.js';
+import { makeTestDeps, TEST_APP_ID, TEST_HMAC_SECRET, type TestDepsBundle } from './helpers.js';
 
 const ISSUER = 'https://api.id.identiti.co.ke';
 const HELPAN_AUDIENCE = 'helpan_authority_issuance';
@@ -136,7 +131,7 @@ describe('ID-10 — stepup actor/initiated_by + helpan_authority_issuance', () =
     const challengeId = res.json().data.challenge_id as string;
 
     const event = deps.eventProducer.events.find(
-      (e) => e.type === 'STEP_UP_REQUIRED' && e.data.challenge_id === challengeId
+      (e) => e.type === 'STEP_UP_REQUIRED' && e.data.challenge_id === challengeId,
     );
     expect(event).toBeDefined();
     expect(event!.data.actor).toEqual({
@@ -160,7 +155,7 @@ describe('ID-10 — stepup actor/initiated_by + helpan_authority_issuance', () =
     expect(initRes.statusCode).toBe(201);
     const challengeId = initRes.json().data.challenge_id as string;
     const event = deps.eventProducer.events.find(
-      (e) => e.type === 'STEP_UP_REQUIRED' && e.data.challenge_id === challengeId
+      (e) => e.type === 'STEP_UP_REQUIRED' && e.data.challenge_id === challengeId,
     );
     const otp = event!.data.otp_plaintext as string;
 
@@ -215,7 +210,7 @@ describe('ID-10 — stepup actor/initiated_by + helpan_authority_issuance', () =
     expect(res.statusCode).toBe(201);
     const challengeId = res.json().data.challenge_id as string;
     const event = deps.eventProducer.events.find(
-      (e) => e.type === 'STEP_UP_REQUIRED' && e.data.challenge_id === challengeId
+      (e) => e.type === 'STEP_UP_REQUIRED' && e.data.challenge_id === challengeId,
     );
     expect(event!.data.actor).toBeUndefined();
     expect(event!.data.initiated_by).toBeUndefined();

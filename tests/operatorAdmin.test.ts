@@ -83,7 +83,7 @@ async function createCustomer(app: App, phone: string): Promise<string> {
 async function seedPendingKyc(
   deps: TestDepsBundle,
   accountId: string,
-  tier: 'tier_1' | 'tier_2' = 'tier_1'
+  tier: 'tier_1' | 'tier_2' = 'tier_1',
 ): Promise<string> {
   const id = `ver_${generateUlid()}`;
   await deps.kycRecordsRepo.create({

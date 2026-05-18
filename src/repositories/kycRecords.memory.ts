@@ -2,11 +2,7 @@
  * In-memory KycRecordsRepo for tests.
  */
 
-import type {
-  KycRecord,
-  KycRecordInsert,
-  KycRecordsRepo,
-} from './types.js';
+import type { KycRecord, KycRecordInsert, KycRecordsRepo } from './types.js';
 
 function inflate(input: KycRecordInsert): KycRecord {
   return {
@@ -72,7 +68,12 @@ export function createMemoryKycRecordsRepo(): KycRecordsRepo & {
     async markVerified(id, opts) {
       const r = data.get(id);
       if (!r || r.status !== 'pending') return null;
-      const updated = { ...r, status: 'verified' as const, verifiedAt: opts.verifiedAt, expiresAt: opts.expiresAt };
+      const updated = {
+        ...r,
+        status: 'verified' as const,
+        verifiedAt: opts.verifiedAt,
+        expiresAt: opts.expiresAt,
+      };
       data.set(id, updated);
       return { ...updated };
     },

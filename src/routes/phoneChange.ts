@@ -33,25 +33,13 @@ import {
 } from '../schemas/phoneChange.js';
 import { isAccountUuid } from '../domain/accountUuid.js';
 import { normalisePhone } from '../domain/phoneNormalise.js';
-import {
-  computeCooldownUntil,
-  isInCooldown,
-} from '../domain/phoneCooldown.js';
-import type {
-  AuthChallengesRepo,
-  CustomersRepo,
-  PhoneChangesRepo,
-} from '../repositories/types.js';
+import { computeCooldownUntil, isInCooldown } from '../domain/phoneCooldown.js';
+import type { AuthChallengesRepo, CustomersRepo, PhoneChangesRepo } from '../repositories/types.js';
 import type { PhoneCrypto } from '../services/phoneCrypto.js';
 import type { EventProducer } from '../services/eventProducer.js';
 import type { AuditLogger } from '../services/auditLogger.js';
 import type { StepupVerifier } from '../services/stepupVerifier.js';
-import {
-  generateOtp,
-  hashOtp,
-  verifyOtp,
-  MAX_OTP_ATTEMPTS,
-} from '../services/otp.js';
+import { generateOtp, hashOtp, verifyOtp, MAX_OTP_ATTEMPTS } from '../services/otp.js';
 import { requireScope } from '../plugins/scope.js';
 
 const ajv = createAjv();
@@ -84,9 +72,7 @@ export interface PhoneChangeRouteDeps {
   otpBcryptRounds: number;
 }
 
-export function phoneChangeRoutes(
-  deps: PhoneChangeRouteDeps
-): FastifyPluginAsync {
+export function phoneChangeRoutes(deps: PhoneChangeRouteDeps): FastifyPluginAsync {
   return async (fastify) => {
     fastify.post<{ Params: { uuid: string } }>(
       '/v1/customers/:uuid/profile/phone-change',
@@ -100,36 +86,32 @@ export function phoneChangeRoutes(
           return reply.code(400).send(
             errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
               field: 'uuid',
-            })
+            }),
           );
         }
         if (!validateInitiate(request.body)) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_request_invalid',
-              'Request body does not match schema',
-              rid,
-              { detail: { errors: validateInitiate.errors ?? [] } }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_request_invalid',
+                'Request body does not match schema',
+                rid,
+                { detail: { errors: validateInitiate.errors ?? [] } },
+              ),
+            );
         }
         const data = request.body as InitiateBody;
 
-        const stepupToken =
-          (request.headers['x-stepup-token'] as string | undefined) ?? null;
+        const stepupToken = (request.headers['x-stepup-token'] as string | undefined) ?? null;
         if (!stepupToken) {
           return reply.code(401).send(
-            errorResponse(
-              'auth_factor_required',
-              'X-Stepup-Token header is required',
-              rid,
-              {
-                detail: {
-                  required_factors: ['phone_otp'],
-                  satisfied_factors: [],
-                },
-              }
-            )
+            errorResponse('auth_factor_required', 'X-Stepup-Token header is required', rid, {
+              detail: {
+                required_factors: ['phone_otp'],
+                satisfied_factors: [],
+              },
+            }),
           );
         }
 
@@ -140,19 +122,17 @@ export function phoneChangeRoutes(
           expectedOperationKind: PHONE_CHANGE_OPERATION_KIND,
         });
         if (verification.kind === 'expired') {
-          return reply
-            .code(401)
-            .send(
-              errorResponse('stepup_token_expired', 'Step-up token has expired', rid, {
-                detail: { expired_at: new Date().toISOString() },
-              })
-            );
+          return reply.code(401).send(
+            errorResponse('stepup_token_expired', 'Step-up token has expired', rid, {
+              detail: { expired_at: new Date().toISOString() },
+            }),
+          );
         }
         if (verification.kind === 'invalid') {
           return reply.code(401).send(
             errorResponse('stepup_token_invalid', 'Step-up token invalid', rid, {
               detail: { reason: verification.reason },
-            })
+            }),
           );
         }
         const stepupJti = verification.jti;
@@ -166,13 +146,11 @@ export function phoneChangeRoutes(
 
         const currentPhone = await deps.customersRepo.getPhoneRecord(uuid);
         if (!currentPhone) {
-          return reply.code(409).send(
-            errorResponse(
-              'state_invalid_for_action',
-              'Account has no bound phone record',
-              rid
-            )
-          );
+          return reply
+            .code(409)
+            .send(
+              errorResponse('state_invalid_for_action', 'Account has no bound phone record', rid),
+            );
         }
         if (isInCooldown(currentPhone.cooldownUntil, new Date())) {
           return reply.code(422).send(
@@ -184,51 +162,56 @@ export function phoneChangeRoutes(
                 detail: {
                   cooldown_until: currentPhone.cooldownUntil!.toISOString(),
                 },
-              }
-            )
+              },
+            ),
           );
         }
 
         const normalisedNew = normalisePhone(data.new_phone);
         if (!normalisedNew) {
           return reply.code(400).send(
-            errorResponse('validation_phone_invalid', 'New phone is not a valid Kenyan E.164 MSISDN', rid, {
-              field: 'new_phone',
-            })
+            errorResponse(
+              'validation_phone_invalid',
+              'New phone is not a valid Kenyan E.164 MSISDN',
+              rid,
+              {
+                field: 'new_phone',
+              },
+            ),
           );
         }
         const newHash = deps.phoneCrypto.hash(normalisedNew);
         if (newHash === currentPhone.phoneHash) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_request_invalid',
-              'New phone is the same as the current phone',
-              rid,
-              { field: 'new_phone' }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_request_invalid',
+                'New phone is the same as the current phone',
+                rid,
+                { field: 'new_phone' },
+              ),
+            );
         }
         const collision = await deps.customersRepo.findByPhoneHash(newHash);
         if (collision && collision.accountUuid !== uuid) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_phone_already_registered',
-              'New phone is already registered to another account',
-              rid,
-              { detail: { phone_token: '<unavailable_at_v1>' } }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_phone_already_registered',
+                'New phone is already registered to another account',
+                rid,
+                { detail: { phone_token: '<unavailable_at_v1>' } },
+              ),
+            );
         }
         const newEncrypted = deps.phoneCrypto.encrypt(normalisedNew);
 
         // Cancel any prior in-flight phone-change for this account.
         const existing = await deps.phoneChangesRepo.findActiveForAccount(uuid);
         if (existing) {
-          await deps.phoneChangesRepo.cancel(
-            existing.id,
-            'superseded_by_new_initiate',
-            new Date()
-          );
+          await deps.phoneChangesRepo.cancel(existing.id, 'superseded_by_new_initiate', new Date());
         }
 
         const changeId = `pch_${generateUlid()}`;
@@ -261,7 +244,7 @@ export function phoneChangeRoutes(
             return reply
               .code(500)
               .send(
-                errorResponse('INTERNAL_UNSPECIFIED', 'Phone record vanished during swap', rid)
+                errorResponse('INTERNAL_UNSPECIFIED', 'Phone record vanished during swap', rid),
               );
           }
 
@@ -305,8 +288,8 @@ export function phoneChangeRoutes(
                 cooldown_until: cooldownUntil.toISOString(),
                 delivery_status: 'n/a' as const,
               },
-              rid
-            )
+              rid,
+            ),
           );
         }
 
@@ -394,10 +377,10 @@ export function phoneChangeRoutes(
               expires_at: expiresAt.toISOString(),
               delivery_status: 'dispatched' as const,
             },
-            rid
-          )
+            rid,
+          ),
         );
-      }
+      },
     );
 
     fastify.post<{ Params: { uuid: string } }>(
@@ -412,18 +395,20 @@ export function phoneChangeRoutes(
           return reply.code(400).send(
             errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
               field: 'uuid',
-            })
+            }),
           );
         }
         if (!validateConfirm(request.body)) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_request_invalid',
-              'Request body does not match schema',
-              rid,
-              { detail: { errors: validateConfirm.errors ?? [] } }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_request_invalid',
+                'Request body does not match schema',
+                rid,
+                { detail: { errors: validateConfirm.errors ?? [] } },
+              ),
+            );
         }
         const data = request.body as ConfirmBody;
 
@@ -434,17 +419,23 @@ export function phoneChangeRoutes(
             .send(errorResponse('phone_change_not_found', 'No phone-change with that id', rid));
         }
         if (change.state !== 'cooldown_active') {
-          return reply.code(409).send(
-            errorResponse(
-              'state_invalid_for_action',
-              `Phone change is in state ${change.state}`,
-              rid,
-              { detail: { current_state: change.state } }
-            )
-          );
+          return reply
+            .code(409)
+            .send(
+              errorResponse(
+                'state_invalid_for_action',
+                `Phone change is in state ${change.state}`,
+                rid,
+                { detail: { current_state: change.state } },
+              ),
+            );
         }
         if (change.expiresAt.getTime() <= Date.now()) {
-          await deps.phoneChangesRepo.cancel(change.id, 'awaiting_confirmation_expired', new Date());
+          await deps.phoneChangesRepo.cancel(
+            change.id,
+            'awaiting_confirmation_expired',
+            new Date(),
+          );
           return reply.code(410).send(
             errorResponse(
               'auth_challenge_expired',
@@ -455,8 +446,8 @@ export function phoneChangeRoutes(
                   challenge_id: change.challengeNewId ?? change.id,
                   expired_at: change.expiresAt.toISOString(),
                 },
-              }
-            )
+              },
+            ),
           );
         }
         if (!change.challengeNewId) {
@@ -466,8 +457,8 @@ export function phoneChangeRoutes(
               errorResponse(
                 'INTERNAL_UNSPECIFIED',
                 'Phone change has no bound challenge (corrupt state)',
-                rid
-              )
+                rid,
+              ),
             );
         }
 
@@ -477,17 +468,21 @@ export function phoneChangeRoutes(
           return reply
             .code(500)
             .send(
-              errorResponse('INTERNAL_UNSPECIFIED', 'Bound challenge is missing or invalid', rid)
+              errorResponse('INTERNAL_UNSPECIFIED', 'Bound challenge is missing or invalid', rid),
             );
         }
         if (challenge.status !== 'pending') {
           // Can happen if the challenge expired separately or got marked
           // failed by max-attempts. Treat as unusable.
-          await deps.phoneChangesRepo.cancel(change.id, `challenge_${challenge.status}`, new Date());
+          await deps.phoneChangesRepo.cancel(
+            change.id,
+            `challenge_${challenge.status}`,
+            new Date(),
+          );
           return reply.code(401).send(
             errorResponse('auth_factor_failed', 'Challenge no longer usable', rid, {
               detail: { challenge_id: challenge.id, attempts_remaining: 0 },
-            })
+            }),
           );
         }
 
@@ -514,14 +509,16 @@ export function phoneChangeRoutes(
               outcome: 'failure',
               detail: { account_uuid: uuid, attempts: newAttempts },
             });
-            return reply.code(401).send(
-              errorResponse(
-                'auth_factor_failed',
-                'Too many failed attempts; phone-change cancelled',
-                rid,
-                { detail: { challenge_id: challenge.id, attempts_remaining: 0 } }
-              )
-            );
+            return reply
+              .code(401)
+              .send(
+                errorResponse(
+                  'auth_factor_failed',
+                  'Too many failed attempts; phone-change cancelled',
+                  rid,
+                  { detail: { challenge_id: challenge.id, attempts_remaining: 0 } },
+                ),
+              );
           }
           await deps.challengesRepo.recordAttempt(challenge.id, {
             status: 'pending',
@@ -531,7 +528,7 @@ export function phoneChangeRoutes(
           return reply.code(401).send(
             errorResponse('auth_factor_failed', 'Invalid OTP', rid, {
               detail: { challenge_id: challenge.id, attempts_remaining: attemptsRemaining },
-            })
+            }),
           );
         }
 
@@ -555,9 +552,7 @@ export function phoneChangeRoutes(
           await deps.phoneChangesRepo.cancel(change.id, 'phone_record_vanished', new Date());
           return reply
             .code(500)
-            .send(
-              errorResponse('INTERNAL_UNSPECIFIED', 'Phone record vanished during swap', rid)
-            );
+            .send(errorResponse('INTERNAL_UNSPECIFIED', 'Phone record vanished during swap', rid));
         }
         await deps.phoneChangesRepo.complete(change.id, now);
 
@@ -600,10 +595,10 @@ export function phoneChangeRoutes(
               change_state: 'completed' as const,
               cooldown_until: cooldownUntil.toISOString(),
             },
-            rid
-          )
+            rid,
+          ),
         );
-      }
+      },
     );
   };
 }

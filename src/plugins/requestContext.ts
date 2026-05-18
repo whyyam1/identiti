@@ -23,9 +23,7 @@ const impl: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('onRequest', async (request, reply) => {
     const incomingRid = request.headers['x-request-id'];
     const requestId =
-      typeof incomingRid === 'string' && incomingRid.length > 0
-        ? incomingRid
-        : generateUlid();
+      typeof incomingRid === 'string' && incomingRid.length > 0 ? incomingRid : generateUlid();
     request.requestId = requestId;
     reply.header('x-request-id', requestId);
 

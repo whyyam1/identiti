@@ -12,12 +12,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildCanonicalString, sha256Hex, signRequest } from '@kmv/platform-shared/hmac';
 import { buildApp, type App } from '../src/app.js';
-import {
-  makeTestDeps,
-  TEST_APP_ID,
-  TEST_HMAC_SECRET,
-  type TestDepsBundle,
-} from './helpers.js';
+import { makeTestDeps, TEST_APP_ID, TEST_HMAC_SECRET, type TestDepsBundle } from './helpers.js';
 
 const IDENTITI_AUDIENCE = 'https://api.id.identiti.co.ke';
 
@@ -52,7 +47,7 @@ function signedAsApp(opts: {
 async function createActiveCustomer(
   app: App,
   deps: TestDepsBundle,
-  phone: string
+  phone: string,
 ): Promise<string> {
   const body = JSON.stringify({
     phone,
@@ -83,7 +78,7 @@ async function mintStepupTokenFor(
   app: App,
   deps: TestDepsBundle,
   account: string,
-  opts: { operationKind?: string; audience?: string } = {}
+  opts: { operationKind?: string; audience?: string } = {},
 ): Promise<string> {
   const operationKind = opts.operationKind ?? 'identiti.phone_change';
   const audience = opts.audience ?? IDENTITI_AUDIENCE;
@@ -111,7 +106,7 @@ async function mintStepupTokenFor(
   }
   const challengeId = initiate.json().data.challenge_id as string;
   const event = deps.eventProducer.events.find(
-    (e) => e.type === 'STEP_UP_REQUIRED' && e.data.challenge_id === challengeId
+    (e) => e.type === 'STEP_UP_REQUIRED' && e.data.challenge_id === challengeId,
   );
   if (!event) throw new Error('expected STEP_UP_REQUIRED event for stepup mint');
   const otp = event.data.otp_plaintext as string;
@@ -186,7 +181,9 @@ describe('POST /v1/customers/:uuid/profile/phone-change', () => {
     // Cooldown is set 24h ahead (within tolerance).
     const record = await deps.customersRepo.getPhoneRecord(account);
     const expectedCooldownMs = 24 * 60 * 60 * 1000;
-    expect(record!.cooldownUntil!.getTime() - Date.now()).toBeGreaterThan(expectedCooldownMs - 5_000);
+    expect(record!.cooldownUntil!.getTime() - Date.now()).toBeGreaterThan(
+      expectedCooldownMs - 5_000,
+    );
 
     // PHONE_CHANGED event published.
     const newEvents = deps.eventProducer.events.slice(eventCountBefore);
@@ -238,7 +235,7 @@ describe('POST /v1/customers/:uuid/profile/phone-change', () => {
     // STEP_UP_REQUIRED published with target.kind='new_phone'.
     const newEvents = deps.eventProducer.events.slice(eventCountBefore);
     const stepupReq = newEvents.find(
-      (e) => e.type === 'STEP_UP_REQUIRED' && e.data.operation_kind === 'identiti.phone_change'
+      (e) => e.type === 'STEP_UP_REQUIRED' && e.data.operation_kind === 'identiti.phone_change',
     );
     expect(stepupReq).toBeDefined();
     expect(stepupReq!.data.target).toMatchObject({
@@ -298,9 +295,7 @@ describe('POST /v1/customers/:uuid/profile/phone-change', () => {
     expect(r.json().error.code).toBe('stepup_token_invalid');
     // Reason here is wrong_audience because we expect IDENTITI_AUDIENCE; the
     // token's aud is kipkiren. Either reason is contract-acceptable.
-    expect(['wrong_audience', 'wrong_operation_kind']).toContain(
-      r.json().error.detail.reason
-    );
+    expect(['wrong_audience', 'wrong_operation_kind']).toContain(r.json().error.detail.reason);
   });
 
   it('rejects a step-up token issued for a different subject', async () => {
@@ -486,7 +481,7 @@ describe('POST /v1/customers/:uuid/profile/phone-change/confirm', () => {
 
   async function initiateMethod2(
     account: string,
-    newPhone: string
+    newPhone: string,
   ): Promise<{ changeId: string; otp: string }> {
     const stepupToken = await mintStepupTokenFor(app, deps, account);
     const url = `/v1/customers/${account}/profile/phone-change`;
@@ -553,9 +548,7 @@ describe('POST /v1/customers/:uuid/profile/phone-change/confirm', () => {
     const newEvents = deps.eventProducer.events.slice(eventCountBefore);
     const phoneChanged = newEvents.find((e) => e.type === 'PHONE_CHANGED');
     expect(phoneChanged).toBeDefined();
-    expect(phoneChanged!.data.verification_method).toBe(
-      'otp_to_new_phone_with_step_up_to_old'
-    );
+    expect(phoneChanged!.data.verification_method).toBe('otp_to_new_phone_with_step_up_to_old');
   });
 
   it('rejects a wrong OTP with auth_factor_failed and decrements attempts', async () => {

@@ -42,11 +42,7 @@ export function createPgStepUpTokensRepo(db: Db): StepUpTokensRepo {
       return result.length > 0;
     },
     async findByJti(jti) {
-      const rows = await db
-        .select()
-        .from(stepUpTokens)
-        .where(eq(stepUpTokens.jti, jti))
-        .limit(1);
+      const rows = await db.select().from(stepUpTokens).where(eq(stepUpTokens.jti, jti)).limit(1);
       const r = rows[0];
       if (!r) return null;
       return {

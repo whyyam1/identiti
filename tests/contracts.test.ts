@@ -87,9 +87,7 @@ describe('contract: POST /v1/customers response (Schema Appendix §4.2)', () => 
     const data = res.json().data;
     const valid = validateCreateResponse(data);
     if (!valid) {
-      throw new Error(
-        'Schema validation failed: ' + JSON.stringify(validateCreateResponse.errors)
-      );
+      throw new Error('Schema validation failed: ' + JSON.stringify(validateCreateResponse.errors));
     }
     expect(valid).toBe(true);
   });
@@ -144,9 +142,7 @@ describe('contract: GET /v1/customers/{uuid} response (Schema Appendix §4.3)', 
     const data = res.json().data;
     const valid = validateReadResponse(data);
     if (!valid) {
-      throw new Error(
-        'Schema validation failed: ' + JSON.stringify(validateReadResponse.errors)
-      );
+      throw new Error('Schema validation failed: ' + JSON.stringify(validateReadResponse.errors));
     }
     expect(valid).toBe(true);
   });

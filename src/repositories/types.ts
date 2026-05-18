@@ -98,7 +98,7 @@ export interface CustomersRepo {
   changeState(
     accountUuid: string,
     fromStates: readonly AccountState[],
-    toState: AccountState
+    toState: AccountState,
   ): Promise<StateChangeResult | null>;
   getTier(accountUuid: string): Promise<TierSnapshot | null>;
   setTier(accountUuid: string, tier: Tier, reason: string): Promise<TierChangeResult | null>;
@@ -107,11 +107,7 @@ export interface CustomersRepo {
 // ─── AuthChallengesRepo ───────────────────────────────────────────────────
 
 export type Factor = 'phone_otp' | 'hardware_key' | 'passive_biometric';
-export type ChallengePurpose =
-  | 'login'
-  | 'stepup'
-  | 'phone_change_to_old'
-  | 'phone_change_to_new';
+export type ChallengePurpose = 'login' | 'stepup' | 'phone_change_to_old' | 'phone_change_to_new';
 export type ChallengeStatus = 'pending' | 'consumed' | 'expired' | 'failed';
 
 export interface AuthChallengeInsert {
@@ -158,7 +154,7 @@ export interface AuthChallengesRepo {
   /** Atomically increment attempts and (optionally) move to terminal status. */
   recordAttempt(
     id: string,
-    next: { status: ChallengeStatus; consumedAt: Date | null; incrementAttempts: boolean }
+    next: { status: ChallengeStatus; consumedAt: Date | null; incrementAttempts: boolean },
   ): Promise<AuthChallenge | null>;
 }
 
@@ -335,7 +331,7 @@ export interface KycRecordsRepo {
   /** Returns true iff some other account already has a verified row for this hash. */
   isNationalIdHashClaimedByOther(
     nationalIdHash: string,
-    excludingAccountId: string
+    excludingAccountId: string,
   ): Promise<boolean>;
   /** Operator approve: pending → verified. Returns null if not found or not pending. */
   markVerified(id: string, opts: { verifiedAt: Date; expiresAt: Date }): Promise<KycRecord | null>;
@@ -347,11 +343,7 @@ export interface KycRecordsRepo {
 // Helpan AI Delegated Authority Contract §2.5 scope shape; §6.3 signing API;
 // §A.2 cross-rail audit invariant.
 
-export type DelegatedAuthorityPeriod =
-  | 'single_use'
-  | 'daily'
-  | 'weekly'
-  | 'monthly';
+export type DelegatedAuthorityPeriod = 'single_use' | 'daily' | 'weekly' | 'monthly';
 
 export interface DelegatedAuthorityScope {
   scope_id: string;

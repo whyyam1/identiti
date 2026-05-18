@@ -50,7 +50,7 @@ export interface AuditLogger {
   listByResource(
     resourceType: string,
     resourceId: string,
-    opts?: AuditListOptions
+    opts?: AuditListOptions,
   ): Promise<AuditEntryRead[]>;
 }
 
@@ -74,15 +74,7 @@ function computeEntryHash(input: {
 }): string {
   const detailString = input.detail ? JSON.stringify(input.detail) : '';
   return createHash('sha256')
-    .update(
-      [
-        input.id,
-        input.appId,
-        input.action,
-        detailString,
-        input.previousHash ?? '',
-      ].join('|')
-    )
+    .update([input.id, input.appId, input.action, detailString, input.previousHash ?? ''].join('|'))
     .digest('hex');
 }
 
@@ -94,7 +86,7 @@ export function createDbAuditLogger(db: Db): AuditLogger {
         .select()
         .from(auditLog)
         .where(
-          sql`${auditLog.resourceType} = ${resourceType} AND ${auditLog.resourceId} = ${resourceId}`
+          sql`${auditLog.resourceType} = ${resourceType} AND ${auditLog.resourceId} = ${resourceId}`,
         )
         .orderBy(sql`${auditLog.createdAt} DESC`)
         .limit(limit);
@@ -170,7 +162,7 @@ export class InMemoryAuditLogger implements AuditLogger {
   async listByResource(
     resourceType: string,
     resourceId: string,
-    opts?: AuditListOptions
+    opts?: AuditListOptions,
   ): Promise<AuditEntryRead[]> {
     const limit = clampListLimit(opts?.limit);
     // Newest-first projection. Tests don't need stable IDs / hash chains, so

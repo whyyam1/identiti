@@ -32,7 +32,7 @@ const KP_AUD = 'https://api.pay.kipkiren.co.ke';
 function signAs(
   appId: string,
   secret: string,
-  opts: { method: string; url: string; body?: string; idempotencyKey?: string }
+  opts: { method: string; url: string; body?: string; idempotencyKey?: string },
 ): Record<string, string> {
   const body = opts.body ?? '';
   const contentType = body ? 'application/json; charset=utf-8' : '';
@@ -89,7 +89,7 @@ function daClaims(
     token_class: string;
     scopes: unknown[];
     step_up_jti: string;
-  }> = {}
+  }> = {},
 ): Record<string, unknown> {
   const now = Math.floor(Date.now() / 1000);
   const jti = overrides.jti ?? `daa_${generateUlid()}`;
@@ -184,7 +184,7 @@ describe('POST /v1/internal/sign', () => {
 
     // Audit-log entry written.
     expect(
-      deps.auditLogger.entries.some((e) => e.action === 'internal.sign.delegated_authority')
+      deps.auditLogger.entries.some((e) => e.action === 'internal.sign.delegated_authority'),
     ).toBe(true);
   });
 

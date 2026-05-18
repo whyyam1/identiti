@@ -5,11 +5,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { phoneTokens } from '../db/schema.js';
-import type {
-  PhoneTokenAudience,
-  PhoneTokenRecord,
-  PhoneTokensRepo,
-} from './types.js';
+import type { PhoneTokenAudience, PhoneTokenRecord, PhoneTokensRepo } from './types.js';
 
 function rowToRecord(r: {
   jti: string;
@@ -47,11 +43,7 @@ export function createPgPhoneTokensRepo(db: Db): PhoneTokensRepo {
       });
     },
     async findByJti(jti) {
-      const rows = await db
-        .select()
-        .from(phoneTokens)
-        .where(eq(phoneTokens.jti, jti))
-        .limit(1);
+      const rows = await db.select().from(phoneTokens).where(eq(phoneTokens.jti, jti)).limit(1);
       const r = rows[0];
       return r ? rowToRecord(r) : null;
     },

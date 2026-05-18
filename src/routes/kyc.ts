@@ -84,18 +84,20 @@ export function kycRoutes(deps: KycRouteDeps): FastifyPluginAsync {
           return reply.code(400).send(
             errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
               field: 'uuid',
-            })
+            }),
           );
         }
         if (!validateIprs(request.body)) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_request_invalid',
-              'Request body does not match schema',
-              rid,
-              { detail: { errors: validateIprs.errors ?? [] } }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_request_invalid',
+                'Request body does not match schema',
+                rid,
+                { detail: { errors: validateIprs.errors ?? [] } },
+              ),
+            );
         }
         const data = request.body as IprsBody;
 
@@ -109,13 +111,15 @@ export function kycRoutes(deps: KycRouteDeps): FastifyPluginAsync {
         // kyc_artefact_already_submitted (Schema Appendix §3.3).
         const existing = await deps.kycRecordsRepo.listByAccount(uuid);
         if (existing.some((r) => r.kind === 'iprs_lookup' && r.status === 'verified')) {
-          return reply.code(409).send(
-            errorResponse(
-              'kyc_artefact_already_submitted',
-              'IPRS lookup already verified for this account',
-              rid
-            )
-          );
+          return reply
+            .code(409)
+            .send(
+              errorResponse(
+                'kyc_artefact_already_submitted',
+                'IPRS lookup already verified for this account',
+                rid,
+              ),
+            );
         }
 
         // Cross-account uniqueness on national_id_hash: refuse silently with
@@ -139,7 +143,7 @@ export function kycRoutes(deps: KycRouteDeps): FastifyPluginAsync {
           return reply.code(422).send(
             errorResponse('kyc_iprs_no_match', 'IPRS lookup did not return a usable match', rid, {
               detail: { lookup_at: new Date().toISOString() },
-            })
+            }),
           );
         }
 
@@ -167,7 +171,7 @@ export function kycRoutes(deps: KycRouteDeps): FastifyPluginAsync {
           return reply.code(502).send(
             errorResponse('upstream_iprs_unavailable', 'IPRS upstream unavailable', rid, {
               detail: { retry_after_seconds: result.retryAfterSeconds ?? 30 },
-            })
+            }),
           );
         }
 
@@ -176,9 +180,7 @@ export function kycRoutes(deps: KycRouteDeps): FastifyPluginAsync {
 
         if (result.kind === 'failed') {
           const failureCode =
-            result.match === 'no_match'
-              ? 'kyc_iprs_no_match'
-              : 'kyc_iprs_document_mismatch';
+            result.match === 'no_match' ? 'kyc_iprs_no_match' : 'kyc_iprs_document_mismatch';
           await deps.kycRecordsRepo.create({
             id: artefactId,
             accountId: uuid,
@@ -225,8 +227,8 @@ export function kycRoutes(deps: KycRouteDeps): FastifyPluginAsync {
                         mismatch_fields: ['name_first', 'name_last', 'date_of_birth'],
                         lookup_at: now.toISOString(),
                       },
-              }
-            )
+              },
+            ),
           );
         }
 
@@ -251,11 +253,7 @@ export function kycRoutes(deps: KycRouteDeps): FastifyPluginAsync {
         // Tier promotion: tier_0 → tier_1 on first verified IPRS lookup.
         let tierPromotedTo: 'tier_1' | undefined;
         if (account.tier === 'tier_0') {
-          const tierResult = await deps.customersRepo.setTier(
-            uuid,
-            'tier_1',
-            'iprs_verified'
-          );
+          const tierResult = await deps.customersRepo.setTier(uuid, 'tier_1', 'iprs_verified');
           if (tierResult) {
             tierPromotedTo = 'tier_1';
             await deps.eventProducer.publish({
@@ -319,7 +317,7 @@ export function kycRoutes(deps: KycRouteDeps): FastifyPluginAsync {
         if (tierPromotedTo) responseData.tier_promoted_to = tierPromotedTo;
 
         return reply.code(201).send(successResponse(responseData, rid));
-      }
+      },
     );
 
     fastify.get<{ Params: { uuid: string } }>(
@@ -332,7 +330,7 @@ export function kycRoutes(deps: KycRouteDeps): FastifyPluginAsync {
           return reply.code(400).send(
             errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
               field: 'uuid',
-            })
+            }),
           );
         }
         const account = await deps.customersRepo.findById(uuid);
@@ -342,10 +340,8 @@ export function kycRoutes(deps: KycRouteDeps): FastifyPluginAsync {
             .send(errorResponse('customer_not_found', 'No account with that UUID', rid));
         }
         const records = await deps.kycRecordsRepo.listByAccount(uuid);
-        return reply
-          .code(200)
-          .send(successResponse({ items: records.map(projectArtefact) }, rid));
-      }
+        return reply.code(200).send(successResponse({ items: records.map(projectArtefact) }, rid));
+      },
     );
 
     fastify.get<{ Params: { uuid: string; id: string } }>(
@@ -358,14 +354,14 @@ export function kycRoutes(deps: KycRouteDeps): FastifyPluginAsync {
           return reply.code(400).send(
             errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
               field: 'uuid',
-            })
+            }),
           );
         }
         if (!VERIFICATION_ARTEFACT_ID_PATTERN.test(id)) {
           return reply.code(400).send(
             errorResponse('validation_request_invalid', 'Artefact ID is malformed', rid, {
               field: 'id',
-            })
+            }),
           );
         }
         const record = await deps.kycRecordsRepo.findById(id);
@@ -375,7 +371,7 @@ export function kycRoutes(deps: KycRouteDeps): FastifyPluginAsync {
             .send(errorResponse('kyc_artefact_not_found', 'No artefact with that ID', rid));
         }
         return reply.code(200).send(successResponse(projectArtefact(record), rid));
-      }
+      },
     );
   };
 }

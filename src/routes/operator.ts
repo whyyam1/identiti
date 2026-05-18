@@ -84,38 +84,31 @@ interface TransitionConfig {
   eventType: 'ACCOUNT_SUSPENDED' | 'ACCOUNT_REACTIVATED';
 }
 
-function buildTransitionHandler(
-  deps: OperatorRouteDeps,
-  cfg: TransitionConfig
-) {
+function buildTransitionHandler(deps: OperatorRouteDeps, cfg: TransitionConfig) {
   return async (
     request: import('fastify').FastifyRequest<{
       Params: { uuid: string };
     }>,
-    reply: import('fastify').FastifyReply
+    reply: import('fastify').FastifyReply,
   ) => {
     const rid = request.requestId;
     const appId = request.appId!;
     const { uuid } = request.params;
 
     if (!isAccountUuid(uuid)) {
-      return reply
-        .code(400)
-        .send(
-          errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
-            field: 'uuid',
-          })
-        );
+      return reply.code(400).send(
+        errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
+          field: 'uuid',
+        }),
+      );
     }
 
     if (!validateActionBody(request.body)) {
-      return reply
-        .code(400)
-        .send(
-          errorResponse('validation_request_invalid', 'Request body does not match schema', rid, {
-            detail: { errors: validateActionBody.errors ?? [] },
-          })
-        );
+      return reply.code(400).send(
+        errorResponse('validation_request_invalid', 'Request body does not match schema', rid, {
+          detail: { errors: validateActionBody.errors ?? [] },
+        }),
+      );
     }
     const data = request.body as ActionBody;
 
@@ -145,18 +138,13 @@ function buildTransitionHandler(
       });
       return reply.code(status).send(
         existing
-          ? errorResponse(
-              code,
-              `Cannot ${cfg.action} account in state ${existing.state}`,
-              rid,
-              {
-                detail: {
-                  current_state: existing.state,
-                  allowed_from_states: cfg.fromStates,
-                },
-              }
-            )
-          : errorResponse(code, 'No account with that UUID', rid)
+          ? errorResponse(code, `Cannot ${cfg.action} account in state ${existing.state}`, rid, {
+              detail: {
+                current_state: existing.state,
+                allowed_from_states: cfg.fromStates,
+              },
+            })
+          : errorResponse(code, 'No account with that UUID', rid),
       );
     }
 
@@ -200,8 +188,8 @@ function buildTransitionHandler(
           to_state: result.toState,
           changed_at: occurredAt,
         },
-        rid
-      )
+        rid,
+      ),
     );
   };
 }
@@ -217,7 +205,7 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
         fromStates: ['active'],
         toState: 'frozen_aml',
         eventType: 'ACCOUNT_SUSPENDED',
-      })
+      }),
     );
 
     fastify.post<{ Params: { uuid: string } }>(
@@ -229,7 +217,7 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
         fromStates: ['frozen_aml'],
         toState: 'active',
         eventType: 'ACCOUNT_REACTIVATED',
-      })
+      }),
     );
 
     // ── Phase 9: audit-trail read ───────────────────────────────────────────
@@ -243,7 +231,7 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
           return reply.code(400).send(
             errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
               field: 'uuid',
-            })
+            }),
           );
         }
         const limitRaw = request.query.limit;
@@ -251,7 +239,7 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
         const entries = await deps.auditLogger.listByResource(
           'platform_account',
           uuid,
-          limit !== undefined ? { limit } : undefined
+          limit !== undefined ? { limit } : undefined,
         );
         return reply.code(200).send(
           successResponse(
@@ -268,10 +256,10 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
                 created_at: e.createdAt.toISOString(),
               })),
             },
-            rid
-          )
+            rid,
+          ),
         );
-      }
+      },
     );
 
     // ── Phase 9: KYC pending list ──────────────────────────────────────────
@@ -283,10 +271,8 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
         const limitRaw = request.query.limit;
         const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined;
         const records = await deps.kycRecordsRepo.listByStatus('pending', limit);
-        return reply.code(200).send(
-          successResponse({ items: records.map(projectKycRecord) }, rid)
-        );
-      }
+        return reply.code(200).send(successResponse({ items: records.map(projectKycRecord) }, rid));
+      },
     );
 
     // ── Phase 9: KYC approve ────────────────────────────────────────────────
@@ -301,18 +287,20 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
           return reply.code(400).send(
             errorResponse('validation_request_invalid', 'Artefact ID is malformed', rid, {
               field: 'id',
-            })
+            }),
           );
         }
         if (!validateKycApproveBody(request.body)) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_request_invalid',
-              'Request body does not match schema',
-              rid,
-              { detail: { errors: validateKycApproveBody.errors ?? [] } }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_request_invalid',
+                'Request body does not match schema',
+                rid,
+                { detail: { errors: validateKycApproveBody.errors ?? [] } },
+              ),
+            );
         }
         const data = (request.body as { narrative?: string }) ?? {};
         const existing = await deps.kycRecordsRepo.findById(id);
@@ -322,14 +310,16 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
             .send(errorResponse('kyc_artefact_not_found', 'No artefact with that ID', rid));
         }
         if (existing.status !== 'pending') {
-          return reply.code(409).send(
-            errorResponse(
-              'state_invalid_for_action',
-              `KYC record is in state ${existing.status}; only pending can be approved`,
-              rid,
-              { detail: { current_state: existing.status } }
-            )
-          );
+          return reply
+            .code(409)
+            .send(
+              errorResponse(
+                'state_invalid_for_action',
+                `KYC record is in state ${existing.status}; only pending can be approved`,
+                rid,
+                { detail: { current_state: existing.status } },
+              ),
+            );
         }
 
         const now = new Date();
@@ -340,13 +330,15 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
         });
         if (!updated) {
           // Race: state changed between findById and markVerified.
-          return reply.code(409).send(
-            errorResponse(
-              'state_invalid_for_action',
-              'KYC record state changed during approval',
-              rid
-            )
-          );
+          return reply
+            .code(409)
+            .send(
+              errorResponse(
+                'state_invalid_for_action',
+                'KYC record state changed during approval',
+                rid,
+              ),
+            );
         }
 
         // Tier promotion if this artefact unlocks a higher tier.
@@ -356,7 +348,7 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
           const tierResult = await deps.customersRepo.setTier(
             updated.accountId,
             'tier_1',
-            'rule_based_tier_1_kyc_complete'
+            'rule_based_tier_1_kyc_complete',
           );
           if (tierResult) {
             tierPromotedTo = 'tier_1';
@@ -414,7 +406,7 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
         const responseData: Record<string, unknown> = projectKycRecord(updated);
         if (tierPromotedTo) responseData.tier_promoted_to = tierPromotedTo;
         return reply.code(200).send(successResponse(responseData, rid));
-      }
+      },
     );
 
     // ── Phase 9: KYC reject ─────────────────────────────────────────────────
@@ -429,18 +421,20 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
           return reply.code(400).send(
             errorResponse('validation_request_invalid', 'Artefact ID is malformed', rid, {
               field: 'id',
-            })
+            }),
           );
         }
         if (!validateKycRejectBody(request.body)) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_request_invalid',
-              'Request body does not match schema',
-              rid,
-              { detail: { errors: validateKycRejectBody.errors ?? [] } }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_request_invalid',
+                'Request body does not match schema',
+                rid,
+                { detail: { errors: validateKycRejectBody.errors ?? [] } },
+              ),
+            );
         }
         const data = request.body as { reason: string };
         const existing = await deps.kycRecordsRepo.findById(id);
@@ -450,24 +444,28 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
             .send(errorResponse('kyc_artefact_not_found', 'No artefact with that ID', rid));
         }
         if (existing.status !== 'pending') {
-          return reply.code(409).send(
-            errorResponse(
-              'state_invalid_for_action',
-              `KYC record is in state ${existing.status}; only pending can be rejected`,
-              rid,
-              { detail: { current_state: existing.status } }
-            )
-          );
+          return reply
+            .code(409)
+            .send(
+              errorResponse(
+                'state_invalid_for_action',
+                `KYC record is in state ${existing.status}; only pending can be rejected`,
+                rid,
+                { detail: { current_state: existing.status } },
+              ),
+            );
         }
         const updated = await deps.kycRecordsRepo.markFailed(id, data.reason);
         if (!updated) {
-          return reply.code(409).send(
-            errorResponse(
-              'state_invalid_for_action',
-              'KYC record state changed during rejection',
-              rid
-            )
-          );
+          return reply
+            .code(409)
+            .send(
+              errorResponse(
+                'state_invalid_for_action',
+                'KYC record state changed during rejection',
+                rid,
+              ),
+            );
         }
 
         await deps.eventProducer.publish({
@@ -502,7 +500,7 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
         });
 
         return reply.code(200).send(successResponse(projectKycRecord(updated), rid));
-      }
+      },
     );
 
     fastify.post<{ Params: { uuid: string } }>(
@@ -516,18 +514,20 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
           return reply.code(400).send(
             errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
               field: 'uuid',
-            })
+            }),
           );
         }
         if (!validateTierOverrideBody(request.body)) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_request_invalid',
-              'Request body does not match schema',
-              rid,
-              { detail: { errors: validateTierOverrideBody.errors ?? [] } }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_request_invalid',
+                'Request body does not match schema',
+                rid,
+                { detail: { errors: validateTierOverrideBody.errors ?? [] } },
+              ),
+            );
         }
         const data = request.body as {
           tier: Tier;
@@ -597,10 +597,10 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
               assigned_at: occurredAt,
               reason: result.reason,
             },
-            rid
-          )
+            rid,
+          ),
         );
-      }
+      },
     );
   };
 }

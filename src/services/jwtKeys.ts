@@ -58,12 +58,10 @@ export function loadOrGenerateKeys(opts: LoadKeysOptions): JwtKeyPair {
     return { privateKey, publicKey, kid, keyClass };
   }
   if (!opts.ephemeralAllowed) {
-    throw new Error(
-      `JWT key PEMs are required outside development/test (keyClass=${keyClass})`
-    );
+    throw new Error(`JWT key PEMs are required outside development/test (keyClass=${keyClass})`);
   }
   opts.logger.warn(
-    `JWT PEMs not provided for keyClass=${keyClass} — generating ephemeral RS256 keypair. Tokens will not survive process restart. Acceptable for dev/test only.`
+    `JWT PEMs not provided for keyClass=${keyClass} — generating ephemeral RS256 keypair. Tokens will not survive process restart. Acceptable for dev/test only.`,
   );
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
   const kid = resolveKid(keyClass, opts.kidOverride, publicKey);
@@ -73,7 +71,7 @@ export function loadOrGenerateKeys(opts: LoadKeysOptions): JwtKeyPair {
 function resolveKid(
   keyClass: JwtKeyClass,
   override: string | undefined,
-  publicKey: KeyObject
+  publicKey: KeyObject,
 ): string {
   if (override && override.length > 0) return override;
   if (keyClass === 'delegated_authority') {
@@ -99,7 +97,7 @@ export async function buildJwks(keys: readonly JwtKeyPair[]): Promise<JwksDocume
     keys.map(async (k) => {
       const jwk = await exportJWK(k.publicKey);
       return { ...jwk, kid: k.kid, use: 'sig', alg: 'RS256' };
-    })
+    }),
   );
   return { keys: out };
 }

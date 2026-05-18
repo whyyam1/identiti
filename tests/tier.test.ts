@@ -372,8 +372,8 @@ describe('POST /v1/operator/customers/{uuid}/tier-override', () => {
     });
     expect(
       deps.auditLogger.entries.some(
-        (e) => e.action === 'operator.customer.tier_override' && e.outcome === 'success'
-      )
+        (e) => e.action === 'operator.customer.tier_override' && e.outcome === 'success',
+      ),
     ).toBe(true);
   });
 });

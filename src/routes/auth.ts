@@ -11,10 +11,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { errorResponse, generateUlid, successResponse } from '@kmv/platform-shared';
 import { createAjv } from '../lib/ajv.js';
-import {
-  createChallengeRequestSchema,
-  customerTokenRequestSchema,
-} from '../schemas/auth.js';
+import { createChallengeRequestSchema, customerTokenRequestSchema } from '../schemas/auth.js';
 import { normalisePhone } from '../domain/phoneNormalise.js';
 import type {
   CustomersRepo,
@@ -108,14 +105,16 @@ export function authRoutes(deps: AuthRouteDeps): FastifyPluginAsync {
         const appId = request.appId!;
 
         if (!validateChallengeRequest(request.body)) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_request_invalid',
-              'Request body does not match schema',
-              rid,
-              { detail: { errors: validateChallengeRequest.errors ?? [] } }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_request_invalid',
+                'Request body does not match schema',
+                rid,
+                { detail: { errors: validateChallengeRequest.errors ?? [] } },
+              ),
+            );
         }
         const data = request.body as ChallengeBody;
 
@@ -128,17 +127,22 @@ export function authRoutes(deps: AuthRouteDeps): FastifyPluginAsync {
                 'auth_factor_unsupported',
                 `Factor ${data.factor} is not supported in this phase`,
                 rid,
-                { field: 'factor' }
-              )
+                { field: 'factor' },
+              ),
             );
         }
 
         const normalised = normalisePhone(data.phone);
         if (!normalised) {
           return reply.code(400).send(
-            errorResponse('validation_phone_invalid', 'Phone is not a valid Kenyan E.164 MSISDN', rid, {
-              field: 'phone',
-            })
+            errorResponse(
+              'validation_phone_invalid',
+              'Phone is not a valid Kenyan E.164 MSISDN',
+              rid,
+              {
+                field: 'phone',
+              },
+            ),
           );
         }
         const phoneHash = deps.phoneCrypto.hash(normalised);
@@ -213,10 +217,10 @@ export function authRoutes(deps: AuthRouteDeps): FastifyPluginAsync {
               expires_at: expiresAt.toISOString(),
               delivery_status: 'dispatched' as const,
             },
-            rid
-          )
+            rid,
+          ),
         );
-      }
+      },
     );
 
     fastify.post(
@@ -229,14 +233,16 @@ export function authRoutes(deps: AuthRouteDeps): FastifyPluginAsync {
         const appId = request.appId!;
 
         if (!validateTokenRequest(request.body)) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_request_invalid',
-              'Request body does not match schema',
-              rid,
-              { detail: { errors: validateTokenRequest.errors ?? [] } }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_request_invalid',
+                'Request body does not match schema',
+                rid,
+                { detail: { errors: validateTokenRequest.errors ?? [] } },
+              ),
+            );
         }
         const data = request.body as TokenBody;
 
@@ -249,28 +255,30 @@ export function authRoutes(deps: AuthRouteDeps): FastifyPluginAsync {
           return reply.code(401).send(
             errorResponse('auth_factor_failed', 'Challenge is no longer usable', rid, {
               detail: { challenge_id: data.challenge_id, attempts_remaining: 0 },
-            })
+            }),
           );
         }
         if (challenge.status !== 'pending') {
           return reply.code(401).send(
             errorResponse('auth_factor_failed', `Challenge is ${challenge.status}`, rid, {
               detail: { challenge_id: challenge.id, attempts_remaining: 0 },
-            })
+            }),
           );
         }
         // /v1/auth/customer-token only consumes login challenges. Step-up
         // challenges (purpose='stepup') must be verified at /v1/stepup/verify
         // to mint the right token shape.
         if (challenge.purpose !== 'login') {
-          return reply.code(401).send(
-            errorResponse(
-              'auth_factor_failed',
-              `Challenge purpose ${challenge.purpose} is not valid for /auth/customer-token`,
-              rid,
-              { detail: { challenge_id: challenge.id, attempts_remaining: 0 } }
-            )
-          );
+          return reply
+            .code(401)
+            .send(
+              errorResponse(
+                'auth_factor_failed',
+                `Challenge purpose ${challenge.purpose} is not valid for /auth/customer-token`,
+                rid,
+                { detail: { challenge_id: challenge.id, attempts_remaining: 0 } },
+              ),
+            );
         }
         if (challenge.expiresAt.getTime() <= Date.now()) {
           await deps.challengesRepo.recordAttempt(challenge.id, {
@@ -286,7 +294,7 @@ export function authRoutes(deps: AuthRouteDeps): FastifyPluginAsync {
                 challenge_id: challenge.id,
                 expired_at: challenge.expiresAt.toISOString(),
               },
-            })
+            }),
           );
         }
         if (typeof data.response !== 'string') {
@@ -297,16 +305,14 @@ export function authRoutes(deps: AuthRouteDeps): FastifyPluginAsync {
                 'auth_factor_unsupported',
                 'Only phone_otp string responses are accepted in this phase',
                 rid,
-                { field: 'response' }
-              )
+                { field: 'response' },
+              ),
             );
         }
         if (!challenge.otpHash) {
           return reply
             .code(400)
-            .send(
-              errorResponse('auth_factor_unsupported', 'Challenge has no OTP hash', rid)
-            );
+            .send(errorResponse('auth_factor_unsupported', 'Challenge has no OTP hash', rid));
         }
 
         const ok = await verifyOtp(data.response, challenge.otpHash);
@@ -334,14 +340,16 @@ export function authRoutes(deps: AuthRouteDeps): FastifyPluginAsync {
             // Schema Appendix §3.1: auth_factor_failed is HTTP 401 with
             // { challenge_id, attempts_remaining } body. attempts_remaining=0
             // signals the challenge is locked; customer must start fresh.
-            return reply.code(401).send(
-              errorResponse(
-                'auth_factor_failed',
-                'Too many failed attempts; challenge is now invalid',
-                rid,
-                { detail: { challenge_id: challenge.id, attempts_remaining: 0 } }
-              )
-            );
+            return reply
+              .code(401)
+              .send(
+                errorResponse(
+                  'auth_factor_failed',
+                  'Too many failed attempts; challenge is now invalid',
+                  rid,
+                  { detail: { challenge_id: challenge.id, attempts_remaining: 0 } },
+                ),
+              );
           }
           await deps.challengesRepo.recordAttempt(challenge.id, {
             status: 'pending',
@@ -351,7 +359,7 @@ export function authRoutes(deps: AuthRouteDeps): FastifyPluginAsync {
           return reply.code(401).send(
             errorResponse('auth_factor_failed', 'Invalid OTP', rid, {
               detail: { challenge_id: challenge.id, attempts_remaining: attemptsRemaining },
-            })
+            }),
           );
         }
 
@@ -454,10 +462,10 @@ export function authRoutes(deps: AuthRouteDeps): FastifyPluginAsync {
               account_uuid: accountUuid,
               session_id: sessionId,
             },
-            rid
-          )
+            rid,
+          ),
         );
-      }
+      },
     );
   };
 }

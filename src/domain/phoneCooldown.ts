@@ -17,18 +17,12 @@ const DAY_MS = 24 * HOUR_MS;
 export const DEFAULT_COOLDOWN_MS = DAY_MS; // 24h
 export const ACTIVE_BALANCE_COOLDOWN_MS = 7 * DAY_MS; // 7 days
 
-export function computeCooldownUntil(
-  now: Date,
-  opts: { hasActiveBalance: boolean }
-): Date {
+export function computeCooldownUntil(now: Date, opts: { hasActiveBalance: boolean }): Date {
   const ms = opts.hasActiveBalance ? ACTIVE_BALANCE_COOLDOWN_MS : DEFAULT_COOLDOWN_MS;
   return new Date(now.getTime() + ms);
 }
 
-export function isInCooldown(
-  cooldownUntil: Date | null | undefined,
-  now: Date
-): boolean {
+export function isInCooldown(cooldownUntil: Date | null | undefined, now: Date): boolean {
   if (!cooldownUntil) return false;
   return cooldownUntil.getTime() > now.getTime();
 }
@@ -40,7 +34,7 @@ export function isInCooldown(
  */
 export function cooldownRemainingSeconds(
   cooldownUntil: Date | null | undefined,
-  now: Date
+  now: Date,
 ): number {
   if (!cooldownUntil) return 0;
   const ms = cooldownUntil.getTime() - now.getTime();

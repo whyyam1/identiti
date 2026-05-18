@@ -10,11 +10,7 @@
 import { eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { phoneRecords, platformAccounts } from '../db/schema.js';
-import type {
-  AccountState,
-  CustomersRepo,
-  Tier,
-} from './types.js';
+import type { AccountState, CustomersRepo, Tier } from './types.js';
 
 interface PgError {
   code?: string;
@@ -22,11 +18,7 @@ interface PgError {
 }
 
 function isUniqueViolation(err: unknown): err is PgError {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    (err as PgError).code === '23505'
-  );
+  return typeof err === 'object' && err !== null && (err as PgError).code === '23505';
 }
 
 export function createPgCustomersRepo(db: Db): CustomersRepo {

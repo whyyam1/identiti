@@ -42,9 +42,7 @@ describe('GET /v1/health', () => {
 
   it('emits a Traceparent header', async () => {
     const res = await app.inject({ method: 'GET', url: '/v1/health' });
-    expect(res.headers['traceparent']).toMatch(
-      /^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/
-    );
+    expect(res.headers['traceparent']).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/);
   });
 
   it('preserves a valid incoming Traceparent', async () => {

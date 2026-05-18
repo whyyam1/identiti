@@ -11,8 +11,7 @@ import { randomUUID } from 'node:crypto';
 
 export type AccountUuid = string & { readonly __brand: 'AccountUuid' };
 
-const ACCOUNT_UUID_RE =
-  /^acc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const ACCOUNT_UUID_RE = /^acc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 export function generateAccountUuid(): AccountUuid {
   return `acc_${randomUUID()}` as AccountUuid;

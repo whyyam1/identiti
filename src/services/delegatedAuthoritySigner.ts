@@ -77,7 +77,7 @@ export type DelegatedAuthoritySignError =
 
 export interface DelegatedAuthoritySigner {
   sign(
-    req: DelegatedAuthoritySignRequest
+    req: DelegatedAuthoritySignRequest,
   ): Promise<
     | { ok: true; result: DelegatedAuthoritySignResult }
     | { ok: false; error: DelegatedAuthoritySignError }
@@ -92,13 +92,13 @@ export interface DelegatedAuthoritySignerOptions {
 }
 
 export function createDelegatedAuthoritySigner(
-  opts: DelegatedAuthoritySignerOptions
+  opts: DelegatedAuthoritySignerOptions,
 ): DelegatedAuthoritySigner {
   const tolerance = opts.clockSkewToleranceSeconds ?? 60;
   return {
     async sign(req) {
       const keyPair = opts.daKeys.find(
-        (k) => k.keyClass === 'delegated_authority' && k.kid === req.kid
+        (k) => k.keyClass === 'delegated_authority' && k.kid === req.kid,
       );
       if (!keyPair) {
         return {

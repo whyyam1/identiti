@@ -9,14 +9,9 @@
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { delegatedAuthoritySignings } from '../db/schema.js';
-import type {
-  DelegatedAuthorityScope,
-  DelegatedAuthoritySigningsRepo,
-} from './types.js';
+import type { DelegatedAuthorityScope, DelegatedAuthoritySigningsRepo } from './types.js';
 
-export function createPgDelegatedAuthoritySigningsRepo(
-  db: Db
-): DelegatedAuthoritySigningsRepo {
+export function createPgDelegatedAuthoritySigningsRepo(db: Db): DelegatedAuthoritySigningsRepo {
   return {
     async create(input) {
       await db.insert(delegatedAuthoritySignings).values({

@@ -8,10 +8,7 @@ import { buildCanonicalString, sha256Hex, signRequest } from '@kmv/platform-shar
 import { buildApp, type App } from '../src/app.js';
 import { makeTestDeps, TEST_APP_ID, TEST_HMAC_SECRET, type TestDepsBundle } from './helpers.js';
 import { createAjv } from '../src/lib/ajv.js';
-import {
-  createChallengeResponseSchema,
-  customerTokenResponseSchema,
-} from '../src/schemas/auth.js';
+import { createChallengeResponseSchema, customerTokenResponseSchema } from '../src/schemas/auth.js';
 import { tierResponseSchema } from '../src/schemas/tier.js';
 
 const ajv = createAjv();
@@ -48,7 +45,7 @@ function signed(opts: {
 async function createCustomerAndChallenge(
   app: App,
   deps: TestDepsBundle,
-  phone: string
+  phone: string,
 ): Promise<{ accountUuid: string; challengeId: string; otp: string }> {
   const body = JSON.stringify({
     phone,
@@ -84,7 +81,7 @@ async function createCustomerAndChallenge(
   });
   const challengeId = c.json().data.challenge_id as string;
   const event = deps.eventProducer.events.find(
-    (e) => e.type === 'AUTH_CHALLENGE_REQUIRED' && e.data.challenge_id === challengeId
+    (e) => e.type === 'AUTH_CHALLENGE_REQUIRED' && e.data.challenge_id === challengeId,
   );
   if (!event) throw new Error('challenge event missing');
   return { accountUuid, challengeId, otp: event.data.otp_plaintext as string };

@@ -72,10 +72,7 @@ export const customerTokenRequestSchema = {
   properties: {
     challenge_id: { type: 'string', pattern: CHALLENGE_ID_PATTERN },
     response: {
-      oneOf: [
-        { type: 'string', pattern: '^[0-9]{6}$' },
-        { type: 'object' },
-      ],
+      oneOf: [{ type: 'string', pattern: '^[0-9]{6}$' }, { type: 'object' }],
     },
     requested_audience: { type: 'string', format: 'uri' },
   },

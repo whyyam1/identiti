@@ -14,10 +14,7 @@
  * IprsResponseSummary projection.
  */
 
-import type {
-  IprsConfidenceBand,
-  IprsMatch,
-} from '../repositories/types.js';
+import type { IprsConfidenceBand, IprsMatch } from '../repositories/types.js';
 
 export interface IprsLookupRequest {
   nationalId: string;
@@ -66,9 +63,10 @@ export interface StubIprsServiceOptions {
   unavailableIds?: string[];
 }
 
-export function createStubIprsService(
-  opts: StubIprsServiceOptions = {}
-): IprsService & { register(id: string, fixture: StubFixture): void; setUnavailable(id: string): void } {
+export function createStubIprsService(opts: StubIprsServiceOptions = {}): IprsService & {
+  register(id: string, fixture: StubFixture): void;
+  setUnavailable(id: string): void;
+} {
   const fixtures = new Map<string, StubFixture>(Object.entries(opts.fixtures ?? {}));
   const unavailable = new Set<string>(opts.unavailableIds ?? []);
 

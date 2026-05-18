@@ -81,19 +81,12 @@ export function createPgKycRecordsRepo(db: Db): KycRecordsRepo {
       return rowToRecord(row);
     },
     async findById(id) {
-      const rows = await db
-        .select()
-        .from(kycRecords)
-        .where(eq(kycRecords.id, id))
-        .limit(1);
+      const rows = await db.select().from(kycRecords).where(eq(kycRecords.id, id)).limit(1);
       const r = rows[0];
       return r ? rowToRecord(r) : null;
     },
     async listByAccount(accountId) {
-      const rows = await db
-        .select()
-        .from(kycRecords)
-        .where(eq(kycRecords.accountId, accountId));
+      const rows = await db.select().from(kycRecords).where(eq(kycRecords.accountId, accountId));
       return rows.map(rowToRecord);
     },
     async listByStatus(status, limit) {
@@ -114,8 +107,8 @@ export function createPgKycRecordsRepo(db: Db): KycRecordsRepo {
           and(
             eq(kycRecords.nationalIdHash, nationalIdHash),
             eq(kycRecords.status, 'verified'),
-            ne(kycRecords.accountId, excludingAccountId)
-          )
+            ne(kycRecords.accountId, excludingAccountId),
+          ),
         )
         .limit(1);
       return rows.length > 0;

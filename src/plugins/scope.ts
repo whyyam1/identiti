@@ -19,8 +19,8 @@ export function requireScope(scope: string): preHandlerHookHandler {
           errorResponse(
             'AUTH_SCOPE_INSUFFICIENT',
             `Missing required scope: ${scope}`,
-            request.requestId
-          )
+            request.requestId,
+          ),
         );
     }
     return;

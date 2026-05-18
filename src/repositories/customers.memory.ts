@@ -2,12 +2,7 @@
  * In-memory CustomersRepo for tests.
  */
 
-import type {
-  AccountState,
-  CustomerRow,
-  CustomersRepo,
-  Tier,
-} from './types.js';
+import type { AccountState, CustomerRow, CustomersRepo, Tier } from './types.js';
 
 interface StoredAccount {
   accountUuid: string;

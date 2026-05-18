@@ -8,12 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildCanonicalString, sha256Hex, signRequest } from '@kmv/platform-shared/hmac';
 import { buildApp, type App } from '../src/app.js';
-import {
-  makeTestDeps,
-  TEST_APP_ID,
-  TEST_HMAC_SECRET,
-  type TestDepsBundle,
-} from './helpers.js';
+import { makeTestDeps, TEST_APP_ID, TEST_HMAC_SECRET, type TestDepsBundle } from './helpers.js';
 
 function signedAsApp(opts: {
   method: string;
@@ -68,7 +63,7 @@ async function postIprs(
   app: App,
   uuid: string,
   body: Record<string, unknown>,
-  idem = `idem_${Math.random().toString(36).slice(2)}`
+  idem = `idem_${Math.random().toString(36).slice(2)}`,
 ) {
   const url = `/v1/customers/${uuid}/kyc/iprs`;
   const payload = JSON.stringify(body);
@@ -187,11 +182,7 @@ describe('POST /v1/customers/:uuid/kyc/iprs', () => {
     expect(r.statusCode).toBe(422);
     const env = r.json();
     expect(env.error.code).toBe('kyc_iprs_document_mismatch');
-    expect(env.error.detail.mismatch_fields).toEqual([
-      'name_first',
-      'name_last',
-      'date_of_birth',
-    ]);
+    expect(env.error.detail.mismatch_fields).toEqual(['name_first', 'name_last', 'date_of_birth']);
   });
 
   it('returns 502 upstream_iprs_unavailable when IPRS is down', async () => {

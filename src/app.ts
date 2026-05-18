@@ -95,9 +95,7 @@ export async function buildApp(deps: AppDeps) {
   });
 
   app.setNotFoundHandler(async (request, reply) => {
-    return reply
-      .code(404)
-      .send(errorResponse('NOT_FOUND', 'Route not found', request.requestId));
+    return reply.code(404).send(errorResponse('NOT_FOUND', 'Route not found', request.requestId));
   });
 
   await app.register(requestContextPlugin);
@@ -124,7 +122,7 @@ export async function buildApp(deps: AppDeps) {
       phoneCrypto: deps.phoneCrypto,
       eventProducer: deps.eventProducer,
       auditLogger: deps.auditLogger,
-    })
+    }),
   );
   await app.register(
     authRoutes({
@@ -139,7 +137,7 @@ export async function buildApp(deps: AppDeps) {
       phoneTokenSigner: deps.phoneTokenSigner,
       otpBcryptRounds: deps.env.OTP_BCRYPT_ROUNDS,
       envName: deps.env.NODE_ENV,
-    })
+    }),
   );
   await app.register(
     phoneTokensRoutes({
@@ -147,7 +145,7 @@ export async function buildApp(deps: AppDeps) {
       phoneTokensRepo: deps.phoneTokensRepo,
       phoneTokenSigner: deps.phoneTokenSigner,
       auditLogger: deps.auditLogger,
-    })
+    }),
   );
   await app.register(
     kycRoutes({
@@ -157,7 +155,7 @@ export async function buildApp(deps: AppDeps) {
       kycHasher: deps.kycHasher,
       eventProducer: deps.eventProducer,
       auditLogger: deps.auditLogger,
-    })
+    }),
   );
   await app.register(
     phoneChangeRoutes({
@@ -169,7 +167,7 @@ export async function buildApp(deps: AppDeps) {
       auditLogger: deps.auditLogger,
       stepupVerifier: deps.stepupVerifier,
       otpBcryptRounds: deps.env.OTP_BCRYPT_ROUNDS,
-    })
+    }),
   );
   await app.register(tierRoutes({ customersRepo: deps.customersRepo }));
   await app.register(
@@ -182,7 +180,7 @@ export async function buildApp(deps: AppDeps) {
       jwtSigner: deps.jwtSigner,
       otpBcryptRounds: deps.env.OTP_BCRYPT_ROUNDS,
       envName: deps.env.NODE_ENV,
-    })
+    }),
   );
   await app.register(
     operatorRoutes({
@@ -190,7 +188,7 @@ export async function buildApp(deps: AppDeps) {
       kycRecordsRepo: deps.kycRecordsRepo,
       eventProducer: deps.eventProducer,
       auditLogger: deps.auditLogger,
-    })
+    }),
   );
   await app.register(
     internalRoutes({
@@ -200,7 +198,7 @@ export async function buildApp(deps: AppDeps) {
       delegatedAuthoritySigner: deps.delegatedAuthoritySigner,
       auditLogger: deps.auditLogger,
       helpanAiAppId: deps.env.HELPAN_AI_APP_ID,
-    })
+    }),
   );
 
   return app;

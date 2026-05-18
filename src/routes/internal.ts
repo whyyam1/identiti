@@ -83,20 +83,22 @@ export function internalRoutes(deps: InternalRouteDeps): FastifyPluginAsync {
               errorResponse(
                 'AUTH_SCOPE_INSUFFICIENT',
                 'Only the Helpan AI internal tenant may call this endpoint',
-                rid
-              )
+                rid,
+              ),
             );
         }
 
         if (!validateRequest(request.body)) {
-          return reply.code(400).send(
-            errorResponse(
-              'validation_request_invalid',
-              'Request body does not match schema',
-              rid,
-              { detail: { errors: validateRequest.errors ?? [] } }
-            )
-          );
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'validation_request_invalid',
+                'Request body does not match schema',
+                rid,
+                { detail: { errors: validateRequest.errors ?? [] } },
+              ),
+            );
         }
         const body = request.body as SignBody;
 
@@ -119,37 +121,38 @@ export function internalRoutes(deps: InternalRouteDeps): FastifyPluginAsync {
           const stepup = await deps.stepUpTokensRepo.findByJti(body.claims.step_up_jti);
           if (!stepup) {
             return reply.code(400).send(
-              errorResponse(
-                'step_up_token_unknown',
-                'Step-up token jti not found',
-                rid,
-                { field: 'claims.step_up_jti' }
-              )
+              errorResponse('step_up_token_unknown', 'Step-up token jti not found', rid, {
+                field: 'claims.step_up_jti',
+              }),
             );
           }
           if (stepup.accountUuid !== body.claims.sub) {
-            return reply.code(400).send(
-              errorResponse(
-                'step_up_token_subject_mismatch',
-                'Step-up token subject does not match claims.sub',
-                rid,
-                { field: 'claims.step_up_jti' }
-              )
-            );
+            return reply
+              .code(400)
+              .send(
+                errorResponse(
+                  'step_up_token_subject_mismatch',
+                  'Step-up token subject does not match claims.sub',
+                  rid,
+                  { field: 'claims.step_up_jti' },
+                ),
+              );
           }
           const consumed = await deps.stepUpTokensRepo.markConsumed(
             body.claims.step_up_jti,
-            new Date()
+            new Date(),
           );
           if (!consumed) {
-            return reply.code(409).send(
-              errorResponse(
-                'step_up_token_already_used',
-                'Step-up token has already been consumed (replay detected)',
-                rid,
-                { field: 'claims.step_up_jti' }
-              )
-            );
+            return reply
+              .code(409)
+              .send(
+                errorResponse(
+                  'step_up_token_already_used',
+                  'Step-up token has already been consumed (replay detected)',
+                  rid,
+                  { field: 'claims.step_up_jti' },
+                ),
+              );
           }
         }
 
@@ -177,12 +180,9 @@ export function internalRoutes(deps: InternalRouteDeps): FastifyPluginAsync {
             },
           });
           return reply.code(400).send(
-            errorResponse(
-              signed.error.code,
-              signed.error.message,
-              rid,
-              { detail: { kid: body.kid } }
-            )
+            errorResponse(signed.error.code, signed.error.message, rid, {
+              detail: { kid: body.kid },
+            }),
           );
         }
 
@@ -228,10 +228,10 @@ export function internalRoutes(deps: InternalRouteDeps): FastifyPluginAsync {
               token: signed.result.token,
               signed_at: signed.result.signedAt.toISOString(),
             },
-            rid
-          )
+            rid,
+          ),
         );
-      }
+      },
     );
   };
 }
