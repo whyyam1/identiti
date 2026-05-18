@@ -1,7 +1,7 @@
 # Identiti Rail — Build Progress and Sprint Tracker
 
 **Document type:** Rail-specific progress tracker. Update at each sprint close.
-**Date:** 15 May 2026
+**Date:** 18 May 2026
 **Cross-rail source of truth:** `c:\Projects\Platform Rails-instruction pack v1-reboot pack v1.2\RECAP.md` — read this file's §3 (dependency graph) and §5 (critical path) before starting any sprint.
 **Cross-rail canonical record:** `c:\Projects\Platform Rails-instruction pack v1-reboot pack v1.2\Platform_Rails_Reboot_Pack_v1_2.md` (v1.2 + Amendment §A, 7 May 2026) — read §7 (Identiti locked decisions), §16.8 (cross-rail wiring), §A (cross-rail scan integration) before sprint kickoff.
 **Rail design corpus:** `Identiti_Rail_Contract_v1.0_Scaffold.md` + Schema Appendix + Amendment §A; `docs/INTEGRATION_MAP.md`; `README.md`.
@@ -15,7 +15,9 @@
 **Stack:** Node.js 22 LTS · TypeScript 5.x strict · Fastify 4.x · AJV (JSON Schema 2020-12) · PostgreSQL 17 via Supabase (eu-west-1) · Drizzle ORM · Kafka (kafkajs) · Vitest · Railway.
 **Dependencies:** `@kmv/platform-shared` — **vendored** into `vendor/platform-shared/` (built `dist/`; dep is `file:./vendor/platform-shared`). Canonical source stays `C:\Projects\platform-shared\`; see `vendor/platform-shared/VENDORED.md`. Interim — long-term plan is publishing to a private registry.
 **Sandbox DB:** Supabase project `Identiti` (`tjqpyblyoslyoplmnlua`, eu-west-1, org `kipkiren3`). Migrations 0001–0008 applied 15 May 2026; 12 tables, RLS on all. `DATABASE_URL` in `.env` (gitignored). Region is eu-west-1, not the Reboot Pack §16.7 `af-south-1` — matches the rest of the KMV Supabase footprint.
-**Deployment:** Live on Railway (15 May 2026) — Nixpacks build from `whyyam1/identiti`, `NODE_ENV=development`, connected to the Supabase DB; healthcheck `/v1/health` green. Dev-mode caveats: ephemeral RS256 keys (regenerate on restart), in-memory Kafka. Not yet hardened to `staging` (real PEMs); no `app_credentials` rows seeded yet. See `docs/RAILWAY_DEPLOY.md`.
+**Deployment:** Live on Railway (15 May 2026) — Nixpacks build from `whyyam1/identiti`, `NODE_ENV=development`, connected to the Supabase DB; healthcheck `/v1/health` green. Dev-mode caveats: ephemeral RS256 keys (regenerate on restart), in-memory Kafka. Not yet hardened to `staging` (real PEMs). See `docs/RAILWAY_DEPLOY.md`.
+**Tooling/CI:** ESLint 9 (flat config) + Prettier wired (`pnpm lint` / `format` / `format:check`); GitHub Actions `ci.yml` runs lint → format → typecheck → test → build on push/PR. Closes the Instruction Pack §1 / §14 handoff-checklist item.
+**Tenants:** 4 sandbox `app_credentials` rows seeded (`sandbox_app`, `sandbox_operator`, `todoku_internal`, `helpan_ai_internal`) via `pnpm db:seed` (`scripts/seed-tenants.ts`, idempotent). HMAC secrets generated at seed time — sandbox-only, rotate before real use.
 
 **Standing position:** Identiti is the **root of the trust graph** and the agent-credential authority per Reboot Pack §A.5 — Helpan AI is registry/scope/dispatch/audit; Identiti is OAuth issuance + the delegated-authority signer. Every other rail blocks on Identiti.
 
@@ -33,11 +35,11 @@ Code state as of 15 May 2026: **ID-1..ID-10 closed**, 147/147 tests pass, typech
 
 **Pick a track — nothing on this rail is blocker-free critical-path anymore:**
 
-- **(A) Operational hardening before Stage 1** — ESLint + Prettier are listed in Instruction Pack §1 as required but aren't wired here yet. CI workflow (GitHub Actions: lint → test → build) likewise. Add `lint` script to `package.json`, an `.eslintrc`, a `.prettierrc`, and `.github/workflows/ci.yml`. Small, no external dep.
+- **(A) Operational hardening before Stage 1 — ✅ DONE (18 May 2026).** ESLint 9 flat config + Prettier wired; `.github/workflows/ci.yml` runs lint → format:check → typecheck → test → build on push/PR. Codebase normalised with Prettier. Closes the Instruction Pack §1 / §14 checklist item.
 - **(B) Railway deploy — ✅ DONE (dev mode, 15 May 2026).** Identiti builds on Railway from `whyyam1/identiti` and runs against the Supabase DB; `/v1/health` green. `@kmv/platform-shared` was vendored to make the repo self-contained. **Remaining sub-tasks:**
-  - **Tenant seeding** — the DB has no `app_credentials` rows, so every authenticated endpoint 401s. Seed at least one HMAC tenant to make the API usable.
-  - **`staging` hardening** — switch `NODE_ENV` to `staging` + supply real RS256 PEMs (`JWT_*_PEM`, `JWT_DA_*_PEM`) so tokens survive restarts; current dev mode uses ephemeral keys. Per `docs/RAILWAY_DEPLOY.md` Profile B.
-  - **Rotate exposed secrets** — the Supabase DB password and the four sandbox crypto keys were surfaced in chat; regenerate before this is anything more than a throwaway sandbox.
+  - ~~**Tenant seeding**~~ — ✅ DONE (18 May 2026). 4 sandbox tenants seeded via `pnpm db:seed` (`scripts/seed-tenants.ts`); `app_credentials` populated, the API authenticates.
+  - **`staging` hardening** — switch `NODE_ENV` to `staging` + supply real RS256 PEMs (`JWT_*_PEM`, `JWT_DA_*_PEM`) so tokens survive restarts; current dev mode uses ephemeral keys. Per `docs/RAILWAY_DEPLOY.md` Profile B. **← next**
+  - **Rotate exposed secrets** — the Supabase DB password, the four sandbox crypto keys, and the four tenant HMAC secrets were surfaced in chat; regenerate before this is anything more than a throwaway sandbox.
   - Custom domain (`sandbox.id.identiti.co.ke` per [Reboot Pack §16.8](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/Platform_Rails_Reboot_Pack_v1_2.md)) + a real Kafka cluster — later.
 - **(C) ID-11 cross-rail integration testing** — unblocks once KP / Todoku reach Sprint 5+. Not yet.
 - **(D) Backlog code items** — none on the critical path:
@@ -59,7 +61,7 @@ Code state as of 15 May 2026: **ID-1..ID-10 closed**, 147/147 tests pass, typech
 - **JIT identity posture** ([Reboot Pack §A.1](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/Platform_Rails_Reboot_Pack_v1_2.md)) — no long-lived bearer tokens, no static service accounts, no refresh on elevated scopes.
 - **Commits:** no `Co-Authored-By: Claude` trailer, no "Generated with Claude Code" footer (user instruction, 15 May 2026).
 
-**Recommended first action:** tenant seeding (B sub-task) — the rail is deployed but the API is unusable until at least one `app_credentials` row exists. After that, `staging` hardening, then (A) operational hardening. None blocked.
+**Recommended first action:** `staging` hardening (B sub-task) — switch the Railway deploy to `NODE_ENV=staging` with real RS256 PEM keys so issued tokens survive restarts, then rotate the chat-exposed secrets. (A) operational hardening and tenant seeding are both done. None blocked.
 
 ---
 
@@ -154,7 +156,10 @@ Cross-rail or programme-level events that touch this rail without producing a sp
 - 15 May 2026 — **`@kmv/platform-shared` vendored.** The `file:../platform-shared` path dep does not survive a separate-repo deploy (Railway clones only the identiti repo). Built `dist/` copied to `vendor/platform-shared/`; dependency repointed to `file:./vendor/platform-shared`; `.gitignore` `dist/` rule anchored to `/dist/` so the vendored dist commits. Interim per platform-shared README "Mode B → Mode A"; long-term is publishing to a private registry. Commit `4f47873` (+ `4f9ad21` removing a stray temp file).
 - 15 May 2026 — **Identiti deployed to Railway (track B).** Railway project under org `kipkiren3`, building from `whyyam1/identiti` via Nixpacks (`railway.json` + `.nvmrc` + `packageManager` pin). First deploy failed the `/v1/health` healthcheck — root cause was unset env vars (the app crashes in `loadEnv()` on boot; Nixpacks also bakes `NODE_ENV=production` into the image, which must be overridden). Resolved by setting `NODE_ENV=development` + `DATABASE_URL` + the four crypto keys in Railway Variables. Healthcheck green; rail is live in dev mode. Remaining: tenant seeding, `staging` hardening with real PEMs, secret rotation — see §1.1 (B). `docs/RAILWAY_DEPLOY.md` documents the full env-var matrix.
 - 15 May 2026 — Date correction: earlier entries this session were mistakenly stamped "13 May 2026"; the actual date is 15 May 2026 (per the ID-10 commit timestamp). Corrected throughout this file.
+- 18 May 2026 — **Operational hardening done (track A).** ESLint 9 flat config (`eslint.config.js`) + Prettier (`.prettierrc`) wired; `lint` / `format` / `format:check` / `db:seed` scripts added; `.github/workflows/ci.yml` runs lint → format:check → typecheck → test → build on push to `main` and on PRs. One-time Prettier normalisation across `src/` + `tests/` (~55 files); ESLint clean on first run; 147/147 tests still pass. Closes the Instruction Pack §1 / §14 handoff-checklist item. Commit `15ea925`.
+- 18 May 2026 — **Tenant seeding done (track B sub-task).** `scripts/seed-tenants.ts` (run via `pnpm db:seed`, idempotent `ON CONFLICT DO NOTHING`) seeds 4 sandbox `app_credentials` rows into the Supabase DB: `sandbox_app` (external; customers/stepup/tier scopes), `sandbox_operator` (internal; operator console), `todoku_internal` (`phone_token:resolve`), `helpan_ai_internal` (`identiti:internal:sign:delegated_authority` — app_id matches the `HELPAN_AI_APP_ID` route pin). The deployed API now authenticates. HMAC secrets generated at seed time; sandbox-only — rotate before real use.
+- 18 May 2026 — Note: the three remaining Identiti sprints cannot be closed — ID-11 needs KP + Todoku live (KP not started, Todoku not deployed); ID-Beta is a Stage-2 gate (pen-test, DR drill); ID-GA needs ODPC registration + H14. All external-dependency walls, not code work. Identiti has no blocker-free sprint work left.
 
 ---
 
-*Identiti Rail · Build Progress · 15 May 2026 · update at each sprint close*
+*Identiti Rail · Build Progress · 18 May 2026 · update at each sprint close*
