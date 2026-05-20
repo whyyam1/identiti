@@ -44,11 +44,12 @@ publishes the resulting Account UUIDs to the other rails.
 | `FIX-FROZEN` | tier_1 | frozen_aml | suspended — KP must reject, Todoku must suppress |
 | `FIX-AGENT` | tier_2 | active | used for the Helpan AI delegated-authority path |
 
-**Action when ID-11 starts:** extend `scripts/seed-tenants.ts` (or add
-`scripts/seed-fixtures.ts`) to create these five accounts and emit their
-Account UUIDs. The UUID format is `acc_<uuid v4>` (random) — the seed must
-print the generated UUIDs so KP/Todoku/Helpan AI can pin them. Do not hardcode
-UUIDs; the fixture identity is the seed output.
+**Status: seeded.** `scripts/seed-fixtures.ts` (run via `pnpm db:seed-fixtures`)
+creates the five fixtures and prints their generated Account UUIDs. Idempotent
+via an `app_correlation = fixture:<KEY>` marker, so re-runs are no-ops. The
+script went live on 20 May 2026 — UUIDs are recorded in the deploy log; ask
+the operator for the current values when wiring KP/Todoku/Helpan AI tests.
+Do not hardcode UUIDs; the fixture identity is the seed output.
 
 ## 3. Cross-rail flows — test matrix
 
