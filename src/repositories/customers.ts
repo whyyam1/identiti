@@ -7,10 +7,20 @@
  * (Rail Contract Schema Appendix §3 / §10.2).
  */
 
-import { eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, lt, sql } from 'drizzle-orm';
+import { generateUlid } from '@kmv/platform-shared';
 import type { Db } from '../db/client.js';
-import { phoneRecords, platformAccounts } from '../db/schema.js';
-import type { AccountState, CustomersRepo, Tier } from './types.js';
+import { phoneRecords, platformAccounts, tierHistory } from '../db/schema.js';
+import type {
+  AccountState,
+  CustomersRepo,
+  Tier,
+  TierAssignment,
+  TierHistoryPage,
+} from './types.js';
+
+const DEFAULT_HISTORY_LIMIT = 50;
+const MAX_HISTORY_LIMIT = 200;
 
 interface PgError {
   code?: string;
@@ -57,6 +67,17 @@ export function createPgCustomersRepo(db: Db): CustomersRepo {
             accountId: input.accountUuid,
             phoneHash: input.phoneHash,
             phoneEncrypted: input.phoneEncrypted,
+          });
+
+          // Seed the initial open tier_0 assignment (Schema Appendix §6.4).
+          // The partial-unique index ensures at most one open row per account.
+          await tx.insert(tierHistory).values({
+            id: `tas_${generateUlid()}`,
+            accountUuid: input.accountUuid,
+            tier: 'tier_0',
+            reason: 'rule_based_tier_0_default',
+            assignedAt: acc.createdAt,
+            endedAt: null,
           });
 
           return acc;
@@ -236,8 +257,74 @@ export function createPgCustomersRepo(db: Db): CustomersRepo {
             updatedAt: sql`NOW()`,
           })
           .where(eq(platformAccounts.id, accountUuid));
+        // Close the open tier-history row (if any) and open a new one.
+        // The partial-unique-index would reject a second open row, so this
+        // close-then-insert ordering must hold within the transaction.
+        await tx
+          .update(tierHistory)
+          .set({ endedAt: now })
+          .where(and(eq(tierHistory.accountUuid, accountUuid), isNull(tierHistory.endedAt)));
+        await tx.insert(tierHistory).values({
+          id: `tas_${generateUlid()}`,
+          accountUuid,
+          tier,
+          reason,
+          assignedAt: now,
+          endedAt: null,
+        });
         return { fromTier, toTier: tier, assignedAt: now, reason };
       });
+    },
+
+    async getTierHistory(accountUuid, opts = {}) {
+      // Confirm the account exists so we can distinguish 404 from empty.
+      const accExists = await db
+        .select({ id: platformAccounts.id })
+        .from(platformAccounts)
+        .where(eq(platformAccounts.id, accountUuid))
+        .limit(1);
+      if (accExists.length === 0) return null;
+
+      const limit = Math.min(Math.max(opts.limit ?? DEFAULT_HISTORY_LIMIT, 1), MAX_HISTORY_LIMIT);
+
+      // Cursor: the assignment_id at which the next page starts. We translate
+      // it to a < cursor's assigned_at filter for the seek. (For ties on
+      // assigned_at we sort assignment_id DESC; same in the WHERE.)
+      let cursorAssignedAt: Date | null = null;
+      if (opts.cursor) {
+        const c = await db
+          .select({ assignedAt: tierHistory.assignedAt })
+          .from(tierHistory)
+          .where(eq(tierHistory.id, opts.cursor))
+          .limit(1);
+        cursorAssignedAt = c[0]?.assignedAt ?? null;
+      }
+      const whereClauses = cursorAssignedAt
+        ? and(
+            eq(tierHistory.accountUuid, accountUuid),
+            lt(tierHistory.assignedAt, cursorAssignedAt),
+          )
+        : eq(tierHistory.accountUuid, accountUuid);
+
+      // Fetch one extra row to know whether a next page exists.
+      const rows = await db
+        .select()
+        .from(tierHistory)
+        .where(whereClauses)
+        .orderBy(desc(tierHistory.assignedAt), desc(tierHistory.id))
+        .limit(limit + 1);
+
+      const slice = rows.slice(0, limit);
+      const next = rows.length > limit ? rows[limit]!.id : null;
+      const items: TierAssignment[] = slice.map((r) => ({
+        assignmentId: r.id,
+        tier: r.tier as Tier,
+        reason: r.reason,
+        assignedAt: r.assignedAt,
+        endedAt: r.endedAt,
+      }));
+      const page: TierHistoryPage = { items, cursor: next };
+      return page;
     },
   };
 }

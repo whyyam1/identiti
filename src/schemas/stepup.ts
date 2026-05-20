@@ -136,12 +136,7 @@ export const verifyStepupResponseSchema = {
 export const validateStepupTokenRequestSchema = {
   $id: 'https://schemas.id.identiti.co.ke/v1/ValidateStepupTokenRequest.json',
   type: 'object',
-  required: [
-    'stepup_token',
-    'expected_audience',
-    'expected_subject',
-    'expected_operation_kind',
-  ],
+  required: ['stepup_token', 'expected_audience', 'expected_subject', 'expected_operation_kind'],
   additionalProperties: false,
   properties: {
     stepup_token: { type: 'string', minLength: 1 },

@@ -2,7 +2,11 @@
  * In-memory CustomersRepo for tests.
  */
 
-import type { AccountState, CustomerRow, CustomersRepo, Tier } from './types.js';
+import { generateUlid } from '@kmv/platform-shared';
+import type { AccountState, CustomerRow, CustomersRepo, Tier, TierAssignment } from './types.js';
+
+const DEFAULT_HISTORY_LIMIT = 50;
+const MAX_HISTORY_LIMIT = 200;
 
 interface StoredAccount {
   accountUuid: string;
@@ -18,9 +22,19 @@ interface StoredAccount {
   phoneLastChangeAt: Date;
 }
 
+interface StoredAssignment {
+  assignmentId: string;
+  accountUuid: string;
+  tier: Tier;
+  reason: string;
+  assignedAt: Date;
+  endedAt: Date | null;
+}
+
 export function createMemoryCustomersRepo(): CustomersRepo {
   const accounts = new Map<string, StoredAccount>();
   const phoneHashes = new Map<string, string>(); // phoneHash → accountUuid
+  const tierHistory: StoredAssignment[] = [];
 
   return {
     async create(input) {
@@ -43,6 +57,15 @@ export function createMemoryCustomersRepo(): CustomersRepo {
       };
       accounts.set(input.accountUuid, stored);
       phoneHashes.set(input.phoneHash, input.accountUuid);
+      // Seed the initial open tier_0 assignment (Schema Appendix §6.4).
+      tierHistory.push({
+        assignmentId: `tas_${generateUlid()}`,
+        accountUuid: input.accountUuid,
+        tier: 'tier_0',
+        reason: 'rule_based_tier_0_default',
+        assignedAt: now,
+        endedAt: null,
+      });
       return {
         kind: 'created',
         outcome: {
@@ -135,7 +158,48 @@ export function createMemoryCustomersRepo(): CustomersRepo {
       a.tier = tier;
       a.tierAssignedAt = now;
       a.tierReason = reason;
+      // Close the open assignment (if any) and open a new one. Mirrors the
+      // partial-unique-index invariant on the PG side: one open row per account.
+      const open = tierHistory.find((h) => h.accountUuid === accountUuid && h.endedAt === null);
+      if (open) open.endedAt = now;
+      tierHistory.push({
+        assignmentId: `tas_${generateUlid()}`,
+        accountUuid,
+        tier,
+        reason,
+        assignedAt: now,
+        endedAt: null,
+      });
       return { fromTier, toTier: tier, assignedAt: now, reason };
+    },
+
+    async getTierHistory(accountUuid, opts = {}) {
+      if (!accounts.has(accountUuid)) return null;
+      const limit = Math.min(Math.max(opts.limit ?? DEFAULT_HISTORY_LIMIT, 1), MAX_HISTORY_LIMIT);
+      // Newest-first by assigned_at; for ties (rare in memory tests), use
+      // assignment_id as a stable tiebreaker.
+      const all = tierHistory
+        .filter((h) => h.accountUuid === accountUuid)
+        .sort((a, b) => {
+          const d = b.assignedAt.getTime() - a.assignedAt.getTime();
+          return d !== 0 ? d : b.assignmentId.localeCompare(a.assignmentId);
+        });
+      // Cursor: skip until we pass the cursor's assignment_id.
+      let start = 0;
+      if (opts.cursor) {
+        const idx = all.findIndex((h) => h.assignmentId === opts.cursor);
+        if (idx >= 0) start = idx;
+      }
+      const slice = all.slice(start, start + limit);
+      const next = start + limit < all.length ? all[start + limit]!.assignmentId : null;
+      const items: TierAssignment[] = slice.map((h) => ({
+        assignmentId: h.assignmentId,
+        tier: h.tier,
+        reason: h.reason,
+        assignedAt: h.assignedAt,
+        endedAt: h.endedAt,
+      }));
+      return { items, cursor: next };
     },
   };
 }

@@ -275,6 +275,24 @@ export const stepUpTokens = pgTable(
   }),
 );
 
+// ─── Tier history (backlog — customer-facing §6.4) ────────────────────────
+
+export const tierHistory = pgTable(
+  'tier_history',
+  {
+    id: text('id').primaryKey(),
+    accountUuid: text('account_uuid').notNull(),
+    tier: text('tier').notNull(),
+    reason: text('reason').notNull(),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull(),
+    endedAt: timestamp('ended_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    accountAssignedIdx: index('tier_history_account_assigned_idx').on(t.accountUuid, t.assignedAt),
+  }),
+);
+
 // ─── ID-10 — delegated-authority signing ledger ───────────────────────────
 
 export const delegatedAuthoritySignings = pgTable(

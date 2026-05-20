@@ -481,13 +481,11 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
         const appId = request.appId!;
 
         if (!validateValidateToken(request.body)) {
-          return reply
-            .code(400)
-            .send(
-              errorResponse('validation_request_invalid', 'Request body does not match schema', rid, {
-                detail: { errors: validateValidateToken.errors ?? [] },
-              }),
-            );
+          return reply.code(400).send(
+            errorResponse('validation_request_invalid', 'Request body does not match schema', rid, {
+              detail: { errors: validateValidateToken.errors ?? [] },
+            }),
+          );
         }
         const data = request.body as ValidateTokenBody;
 

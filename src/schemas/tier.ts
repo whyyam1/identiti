@@ -29,6 +29,38 @@ export const tierResponseSchema = {
   },
 } as const;
 
+const TIER_ASSIGNMENT_ID_PATTERN = '^tas_[0-9A-HJKMNP-TV-Z]{26}$';
+
+/**
+ * Response: GET /v1/customers/{uuid}/tier/history — Schema Appendix §6.4.
+ * Each item is an assignment (a period the account spent at a tier). The
+ * currently-open assignment has no `ended_at`. Newest-first; opaque cursor.
+ */
+export const tierHistoryResponseSchema = {
+  $id: 'identiti/TierHistoryResponse',
+  type: 'object',
+  required: ['items', 'cursor'],
+  additionalProperties: false,
+  properties: {
+    items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['assignment_id', 'tier', 'assigned_at', 'reason'],
+        additionalProperties: false,
+        properties: {
+          assignment_id: { type: 'string', pattern: TIER_ASSIGNMENT_ID_PATTERN },
+          tier: { type: 'string', enum: ['tier_0', 'tier_1', 'tier_2'] },
+          assigned_at: { type: 'string', pattern: TIMESTAMP_PATTERN },
+          reason: { type: 'string', enum: TIER_REASON_ENUM },
+          ended_at: { type: 'string', pattern: TIMESTAMP_PATTERN },
+        },
+      },
+    },
+    cursor: { type: ['string', 'null'] },
+  },
+} as const;
+
 /** Operator tier-override request (rail-internal — not in Schema Appendix). */
 export const tierOverrideRequestSchema = {
   $id: 'identiti/TierOverrideRequest',

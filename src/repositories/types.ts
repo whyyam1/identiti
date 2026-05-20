@@ -72,6 +72,31 @@ export interface TierChangeResult {
   reason: string;
 }
 
+/**
+ * A tier assignment — one period the account spent at a given tier.
+ * Schema Appendix §6.4. The currently-open assignment has `endedAt: null`.
+ */
+export interface TierAssignment {
+  assignmentId: string; // tas_<ULID>
+  tier: Tier;
+  assignedAt: Date;
+  endedAt: Date | null;
+  reason: string;
+}
+
+export interface TierHistoryListOptions {
+  /** Hard cap on items returned. Defaults to 50; clamped to 200. */
+  limit?: number;
+  /** Opaque cursor: the assignment_id of the next item from a previous page. */
+  cursor?: string | null;
+}
+
+export interface TierHistoryPage {
+  items: readonly TierAssignment[];
+  /** Next-page cursor when more items exist; null when the page is the last. */
+  cursor: string | null;
+}
+
 export interface PhoneRecord {
   phoneHash: string;
   phoneEncrypted: string;
@@ -102,6 +127,11 @@ export interface CustomersRepo {
   ): Promise<StateChangeResult | null>;
   getTier(accountUuid: string): Promise<TierSnapshot | null>;
   setTier(accountUuid: string, tier: Tier, reason: string): Promise<TierChangeResult | null>;
+  /** Schema Appendix §6.4 — paginated, newest first. Returns null if the account does not exist. */
+  getTierHistory(
+    accountUuid: string,
+    opts?: TierHistoryListOptions,
+  ): Promise<TierHistoryPage | null>;
 }
 
 // ─── AuthChallengesRepo ───────────────────────────────────────────────────
