@@ -48,53 +48,74 @@ export type StepupVerificationResult =
   | { kind: 'expired' };
 
 export interface StepupVerifier {
+  /**
+   * Full verification with single-use enforcement: verifies the token AND
+   * atomically marks the JTI consumed. Use when the step-up token authorises
+   * an action (e.g. phone change). A replayed JTI returns `replay_detected`.
+   */
   verify(req: StepupVerificationRequest): Promise<StepupVerificationResult>;
+  /**
+   * Non-consuming verification — signature + iss/aud/exp/nbf + sub +
+   * operation_kind, but NOT the single-use check. Use for the diagnostic
+   * `POST /v1/stepup/tokens/validate` endpoint (Scaffold §14.4: a query, not
+   * a guard). Never returns `replay_detected`.
+   */
+  inspect(req: StepupVerificationRequest): Promise<StepupVerificationResult>;
 }
 
 export function createStepupVerifier(opts: StepupVerifierOptions): StepupVerifier {
+  /** Steps 1-11: signature + claim checks, no JTI consumption. */
+  async function inspect(req: StepupVerificationRequest): Promise<StepupVerificationResult> {
+    let payload: JWTPayload | null = null;
+    let lastErr: { code?: string } | null = null;
+    for (const k of opts.jwtKeys) {
+      try {
+        const result = await jwtVerify(req.token, k.publicKey, {
+          issuer: opts.issuer,
+          audience: req.expectedAudience,
+        });
+        payload = result.payload;
+        break;
+      } catch (e) {
+        lastErr = e as { code?: string };
+      }
+    }
+    if (!payload) {
+      const code = lastErr?.code ?? '';
+      if (code === 'ERR_JWT_EXPIRED') return { kind: 'expired' };
+      if (code === 'ERR_JWT_CLAIM_VALIDATION_FAILED') {
+        // jose throws this for issuer / audience mismatches and missing
+        // required claims. We can't easily distinguish wrong_audience from
+        // signature_invalid here, but audience mismatch is far more common
+        // for a token that did pass signature.
+        return { kind: 'invalid', reason: 'wrong_audience' };
+      }
+      return { kind: 'invalid', reason: 'signature_invalid' };
+    }
+    if (payload.sub !== req.expectedSubject) {
+      return { kind: 'invalid', reason: 'wrong_subject' };
+    }
+    if ((payload as Record<string, unknown>).operation_kind !== req.expectedOperationKind) {
+      return { kind: 'invalid', reason: 'wrong_operation_kind' };
+    }
+    const jti = typeof payload.jti === 'string' ? payload.jti : null;
+    if (!jti) {
+      return { kind: 'invalid', reason: 'malformed' };
+    }
+    return { kind: 'valid', jti, claims: payload };
+  }
+
   return {
+    inspect,
     async verify(req) {
-      let payload: JWTPayload | null = null;
-      let lastErr: { code?: string } | null = null;
-      for (const k of opts.jwtKeys) {
-        try {
-          const result = await jwtVerify(req.token, k.publicKey, {
-            issuer: opts.issuer,
-            audience: req.expectedAudience,
-          });
-          payload = result.payload;
-          break;
-        } catch (e) {
-          lastErr = e as { code?: string };
-        }
-      }
-      if (!payload) {
-        const code = lastErr?.code ?? '';
-        if (code === 'ERR_JWT_EXPIRED') return { kind: 'expired' };
-        if (code === 'ERR_JWT_CLAIM_VALIDATION_FAILED') {
-          // jose throws this for issuer / audience mismatches and missing
-          // required claims. We can't easily distinguish wrong_audience from
-          // signature_invalid here, but audience mismatch is far more common
-          // for a token that did pass signature.
-          return { kind: 'invalid', reason: 'wrong_audience' };
-        }
-        return { kind: 'invalid', reason: 'signature_invalid' };
-      }
-      if (payload.sub !== req.expectedSubject) {
-        return { kind: 'invalid', reason: 'wrong_subject' };
-      }
-      if ((payload as Record<string, unknown>).operation_kind !== req.expectedOperationKind) {
-        return { kind: 'invalid', reason: 'wrong_operation_kind' };
-      }
-      const jti = typeof payload.jti === 'string' ? payload.jti : null;
-      if (!jti) {
-        return { kind: 'invalid', reason: 'malformed' };
-      }
-      const fresh = await opts.stepUpTokensRepo.markConsumed(jti, new Date());
+      const result = await inspect(req);
+      if (result.kind !== 'valid') return result;
+      // Step 12-13: atomic single-use enforcement.
+      const fresh = await opts.stepUpTokensRepo.markConsumed(result.jti, new Date());
       if (!fresh) {
         return { kind: 'invalid', reason: 'replay_detected' };
       }
-      return { kind: 'valid', jti, claims: payload };
+      return result;
     },
   };
 }

@@ -66,6 +66,7 @@ export function makeMemCredStore(opts: { suspended?: boolean } = {}): AppCredent
               'identiti:customers:read',
               'identiti:customers:write',
               'identiti:stepup:request',
+              'identiti:stepup:verify',
               'identiti:tier:read',
             ],
             status: opts.suspended ? 'suspended' : 'active',

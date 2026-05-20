@@ -178,6 +178,7 @@ export async function buildApp(deps: AppDeps) {
       eventProducer: deps.eventProducer,
       auditLogger: deps.auditLogger,
       jwtSigner: deps.jwtSigner,
+      stepupVerifier: deps.stepupVerifier,
       otpBcryptRounds: deps.env.OTP_BCRYPT_ROUNDS,
       envName: deps.env.NODE_ENV,
     }),

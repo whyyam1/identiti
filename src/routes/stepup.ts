@@ -1,12 +1,13 @@
 /**
  * Step-up endpoints — Schema Appendix §7, Scaffold §14.
- *   POST /v1/stepup/challenges  — initiate (publishes STEP_UP_REQUIRED)
- *   POST /v1/stepup/verify      — consume challenge, issue RS256 step-up JWT
+ *   POST /v1/stepup/challenges       — initiate (publishes STEP_UP_REQUIRED)
+ *   POST /v1/stepup/verify           — consume challenge, issue RS256 step-up JWT
+ *   POST /v1/stepup/tokens/validate  — diagnostic non-consuming validation
  *
- * `/v1/stepup/tokens/validate` (Schema Appendix §7.5) is deliberately NOT
- * shipped in v1.0 — it's a diagnostic endpoint per Scaffold §14.4 and KP
- * verifies tokens locally against the JWKS per §16.3. Add when an
- * edge-case caller materialises.
+ * `/v1/stepup/tokens/validate` (Schema Appendix §7.5/§7.6, Scaffold §14.4) is
+ * a diagnostic: it verifies a step-up JWT without consuming the JTI. KP and
+ * other relying rails still verify locally against the JWKS per §16.3 — this
+ * endpoint is a convenience for callers that prefer a server-side check.
  *
  * Reuses `auth_challenges` with `purpose='stepup'` (table is shared by
  * design; migration 0003 supports this).
@@ -18,6 +19,7 @@ import { createAjv } from '../lib/ajv.js';
 import {
   initiateStepupRequestSchema,
   verifyStepupRequestSchema,
+  validateStepupTokenRequestSchema,
   STEPUP_TTL_BY_RISK,
 } from '../schemas/stepup.js';
 import { isAccountUuid } from '../domain/accountUuid.js';
@@ -32,12 +34,14 @@ import type {
 import type { EventProducer } from '../services/eventProducer.js';
 import type { AuditLogger } from '../services/auditLogger.js';
 import type { JwtSigner } from '../services/jwtSigner.js';
+import type { StepupVerifier } from '../services/stepupVerifier.js';
 import { generateOtp, hashOtp, verifyOtp, MAX_OTP_ATTEMPTS } from '../services/otp.js';
 import { requireScope } from '../plugins/scope.js';
 
 const ajv = createAjv();
 const validateInitiate = ajv.compile(initiateStepupRequestSchema);
 const validateVerify = ajv.compile(verifyStepupRequestSchema);
+const validateValidateToken = ajv.compile(validateStepupTokenRequestSchema);
 
 interface InitiateBody {
   account_uuid: string;
@@ -61,6 +65,13 @@ interface VerifyBody {
   client_device?: unknown;
 }
 
+interface ValidateTokenBody {
+  stepup_token: string;
+  expected_audience: string;
+  expected_subject: string;
+  expected_operation_kind: string;
+}
+
 export interface StepupRouteDeps {
   customersRepo: CustomersRepo;
   challengesRepo: AuthChallengesRepo;
@@ -68,6 +79,7 @@ export interface StepupRouteDeps {
   eventProducer: EventProducer;
   auditLogger: AuditLogger;
   jwtSigner: JwtSigner;
+  stepupVerifier: StepupVerifier;
   otpBcryptRounds: number;
   envName: string;
 }
@@ -456,5 +468,64 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
         ),
       );
     });
+
+    // POST /v1/stepup/tokens/validate — Schema Appendix §7.5/§7.6.
+    // Diagnostic: verifies a step-up JWT without consuming its JTI. Always
+    // returns 200 — `valid` carries the verdict (an invalid token is not an
+    // HTTP error, it's a query result).
+    fastify.post(
+      '/v1/stepup/tokens/validate',
+      { preHandler: requireScope('identiti:stepup:verify') },
+      async (request, reply) => {
+        const rid = request.requestId;
+        const appId = request.appId!;
+
+        if (!validateValidateToken(request.body)) {
+          return reply
+            .code(400)
+            .send(
+              errorResponse('validation_request_invalid', 'Request body does not match schema', rid, {
+                detail: { errors: validateValidateToken.errors ?? [] },
+              }),
+            );
+        }
+        const data = request.body as ValidateTokenBody;
+
+        const result = await deps.stepupVerifier.inspect({
+          token: data.stepup_token,
+          expectedAudience: data.expected_audience,
+          expectedSubject: data.expected_subject,
+          expectedOperationKind: data.expected_operation_kind,
+        });
+
+        const body =
+          result.kind === 'valid'
+            ? { valid: true as const, claims: result.claims }
+            : {
+                valid: false as const,
+                invalid_reason: result.kind === 'expired' ? 'expired' : result.reason,
+              };
+
+        await deps.auditLogger.append({
+          appId,
+          actorType: 'app',
+          actorId: appId,
+          action: 'stepup.token.validate',
+          resourceType: 'step_up_token',
+          ...(result.kind === 'valid' ? { resourceId: result.jti } : {}),
+          requestId: rid,
+          traceparent: request.traceparent,
+          outcome: 'success',
+          detail: {
+            valid: body.valid,
+            expected_subject: data.expected_subject,
+            expected_operation_kind: data.expected_operation_kind,
+            ...(body.valid ? {} : { invalid_reason: body.invalid_reason }),
+          },
+        });
+
+        return reply.code(200).send(successResponse(body, rid));
+      },
+    );
   };
 }

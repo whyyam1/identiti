@@ -127,6 +127,43 @@ export const verifyStepupResponseSchema = {
 } as const;
 
 /**
+ * `POST /v1/stepup/tokens/validate` — diagnostic token validation (Schema
+ * Appendix §7.5 / §7.6, Scaffold §14.4). A query, not a guard: it verifies a
+ * step-up JWT cryptographically and against the expected claims, and does NOT
+ * consume the JTI. `expected_audience` accepts a URI or the non-URI
+ * `helpan_authority_issuance` audience, consistent with the step-up challenge.
+ */
+export const validateStepupTokenRequestSchema = {
+  $id: 'https://schemas.id.identiti.co.ke/v1/ValidateStepupTokenRequest.json',
+  type: 'object',
+  required: [
+    'stepup_token',
+    'expected_audience',
+    'expected_subject',
+    'expected_operation_kind',
+  ],
+  additionalProperties: false,
+  properties: {
+    stepup_token: { type: 'string', minLength: 1 },
+    expected_audience: operationAudienceSchema,
+    expected_subject: { type: 'string', pattern: ACCOUNT_UUID_PATTERN },
+    expected_operation_kind: { type: 'string', enum: OPERATION_KIND_ENUM },
+  },
+} as const;
+
+export const validateStepupTokenResponseSchema = {
+  $id: 'https://schemas.id.identiti.co.ke/v1/ValidateStepupTokenResponse.json',
+  type: 'object',
+  required: ['valid'],
+  additionalProperties: false,
+  properties: {
+    valid: { type: 'boolean' },
+    claims: { type: 'object', description: 'Present when valid is true.' },
+    invalid_reason: { type: 'string', description: 'Present when valid is false.' },
+  },
+} as const;
+
+/**
  * Risk-tier → step-up token TTL (seconds), per Schema Appendix §7.4 envelope
  * (60 minimum, 600 maximum) and Scaffold §14.3 ("default 300; can be 60 for
  * very-high-risk operations"). Lower risk = longer freshness window.
