@@ -1,7 +1,7 @@
 # Identiti Rail — Build Progress and Sprint Tracker
 
 **Document type:** Rail-specific progress tracker. Update at each sprint close.
-**Date:** 20 May 2026
+**Date:** 21 May 2026
 **Cross-rail source of truth:** `c:\Projects\Platform Rails-instruction pack v1-reboot pack v1.2\RECAP.md` — read this file's §3 (dependency graph) and §5 (critical path) before starting any sprint.
 **Cross-rail canonical record:** `c:\Projects\Platform Rails-instruction pack v1-reboot pack v1.2\Platform_Rails_Reboot_Pack_v1_2.md` (v1.2 + Amendment §A, 7 May 2026) — read §7 (Identiti locked decisions), §16.8 (cross-rail wiring), §A (cross-rail scan integration) before sprint kickoff.
 **Rail design corpus:** `Identiti_Rail_Contract_v1.0_Scaffold.md` + Schema Appendix + Amendment §A; `docs/INTEGRATION_MAP.md`; `README.md`.
@@ -170,4 +170,4 @@ Cross-rail or programme-level events that touch this rail without producing a sp
 
 ---
 
-*Identiti Rail · Build Progress · 20 May 2026 · update at each sprint close*
+*Identiti Rail · Build Progress · 21 May 2026 · update at each sprint close*
