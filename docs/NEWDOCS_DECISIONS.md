@@ -2,7 +2,7 @@
 
 **Date:** 21 May 2026
 **Source pack:** [`NEWDOCS_INSTRUCTION_PACK.md`](NEWDOCS_INSTRUCTION_PACK.md) — Chamia's 21 May newdocs additions.
-**Status:** Positions taken below. Q3/Q5/Q6 follow the source pack's recommendations and are settled. Q1/Q2/Q4 are flagged for Chamia confirmation before code lands; tentative positions are recorded so design can proceed in parallel.
+**Status:** **All six open questions settled 21 May 2026.** Q3/Q5/Q6 follow the source pack's recommendations. Q1/Q2/Q4 confirmed by the operator on the recommended positions. ID-12, ID-13, ID-14, ID-16, ID-17 builds can proceed without rework risk.
 **How to read this:** every position is followed by **Why** (reasoning) and **Blast radius** (what code/contract this binds).
 
 ---
@@ -11,7 +11,7 @@
 
 **Question.** Does a successful rider-KYC promote the account to `tier_1`, or is `rider_class` an orthogonal dimension layered on top of the existing 3-tier model?
 
-**Position (tentative — needs Chamia confirmation):** **Orthogonal.** Rider-KYC creates a `rider_class` *capability flag* on the account; it does **not** promote the financial tier.
+**Position (confirmed 21 May 2026):** **Orthogonal.** Rider-KYC creates a `rider_class` *capability flag* on the account; it does **not** promote the financial tier.
 
 **Why.**
 - The existing 3-tier model (`tier_0 / tier_1 / tier_2`) is calibrated to **financial KYC strength** — IPRS verification, transaction limits, EDD. Tier promotion is what unlocks higher KP transaction ceilings (Reboot Pack KP-D-04).
@@ -33,7 +33,7 @@
 
 **Question.** Reboot Pack §A.1 says no long-lived bearer tokens; 72h is far outside the 5-min step-up / 15-min phone-token / 30-min customer-token band. Document KWS as an explicit exception, or shorten?
 
-**Position (defensible — flag to Chamia but proceed):** **Document as an explicit, narrow exception. Do not shorten.**
+**Position (confirmed 21 May 2026):** **Document as an explicit, narrow exception. Do not shorten.**
 
 **Why.**
 - KWS scoped tokens are not user-session tokens. They authorise a **contract-development workflow** (proforma approval, DNS provisioning, SSL issuance) that doesn't fit a 5-min freshness window without making operators sign in 14 times an hour.
@@ -74,7 +74,7 @@
 
 **Question.** Identiti canonical (Hakken's assumption), or aggregated from per-app sources?
 
-**Position (tentative — needs Chamia confirmation):** **Identiti canonical.** Identiti stores the authoritative consent record; consuming apps cache and invalidate via webhook.
+**Position (confirmed 21 May 2026):** **Identiti canonical.** Identiti stores the authoritative consent record; consuming apps cache and invalidate via webhook.
 
 **Why.**
 - Identiti is already the trust root for cross-rail identity (Account UUID). Consent attaches naturally to identity.
@@ -137,15 +137,13 @@ Given the positions above:
 
 | Sprint | Status after this doc |
 |---|---|
-| ID-12 Rider-KYC | Tier semantics tentatively orthogonal (Q1). Code can be scaffolded assuming orthogonal; rework is ~1 day if Chamia disagrees. |
-| ID-13 KYB | New family `/v1/kyb/*` settled (Q5). Schema design TBD at kick-off; capacity-planning conversation flagged. |
-| ID-14 Consent surface | Identiti canonical tentatively (Q4). Schema design proceeds against canonical assumption; flag to Hakken at HK-0. |
-| ID-15 LipaStack audience | Trivial config — **shipping today** alongside this doc. No design questions. |
-| ID-16 KWS delegation | Helpan AI signs (Q6) — zero net-new Identiti code. Paper sign-off doc when KWS-S10 firms. 72h exception documented (Q2). |
+| ID-12 Rider-KYC | Tier semantics orthogonal (Q1 — confirmed). Build proceeds without rework risk. |
+| ID-13 KYB | New family `/v1/kyb/*` (Q5). Schema design TBD at kick-off; capacity-planning conversation flagged. |
+| ID-14 Consent surface | Identiti canonical (Q4 — confirmed). Schema design proceeds against canonical assumption; flag to Hakken at HK-0. |
+| ID-15 LipaStack audience | Trivial config — **shipped 21 May 2026**. No design questions. |
+| ID-16 KWS delegation | Helpan AI signs (Q6) — zero net-new Identiti code. Paper sign-off doc when KWS-S10 firms. 72h exception documented (Q2 — confirmed). |
 | ID-17 Operator surface | Sub-surface of step-up (Q3) — settled. Biggest piece is the WebAuthn / FIDO2 factor adapter. |
 
 ## Outstanding asks for Chamia
 
-1. Confirm **Q1** (rider-KYC tier semantics). I'm building against `orthogonal rider_class`.
-2. Confirm **Q4** (consent canonical in Identiti). I'm building against Identiti canonical.
-3. Note **Q2** — KWS 72h documented as a deliberate, narrow exception; if you want it tightened, say so before KWS-S10.
+~~All six questions resolved on 21 May 2026.~~ Nothing outstanding.
