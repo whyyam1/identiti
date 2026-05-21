@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0e1a" />
+    <meta
+      name="description"
+      content="Identiti — the identity rail for the KMV Platform. Account UUIDs, KYC, step-up auth, and delegated authority signing for AI agents."
+    />
+    <title>Identiti — Identity rail for the KMV Platform</title>
+    <style>
+      :root {
+        --bg: #0a0e1a;
+        --bg-elev: #131826;
+        --bg-code: #1e293b;
+        --border: #1f2937;
+        --border-bright: #334155;
+        --text: #e5e7eb;
+        --text-muted: #94a3b8;
+        --text-dim: #64748b;
+        --accent: #10b981;
+        --accent-dim: rgba(16, 185, 129, 0.15);
+        --indigo: #6366f1;
+        --indigo-dim: rgba(99, 102, 241, 0.15);
+        --amber: #f59e0b;
+        --rose: #f43f5e;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      body {
+        background:
+          radial-gradient(ellipse at top, rgba(99, 102, 241, 0.08), transparent 60%),
+          radial-gradient(ellipse at bottom right, rgba(16, 185, 129, 0.05), transparent 60%),
+          var(--bg);
+        min-height: 100vh;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 32px 20px 96px;
+      }
+      code,
+      pre,
+      .mono {
+        font-family:
+          ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+        font-size: 13px;
+      }
+      h1,
+      h2,
+      h3 {
+        line-height: 1.25;
+        letter-spacing: -0.02em;
+      }
+      h1 {
+        font-size: 32px;
+        font-weight: 700;
+        margin: 0 0 8px;
+      }
+      h2 {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin: 48px 0 16px;
+      }
+      h3 {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      p {
+        margin: 0 0 16px;
+        color: var(--text);
+      }
+      .lede {
+        font-size: 17px;
+        color: var(--text-muted);
+        margin-bottom: 24px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+      }
+      .pill.live {
+        background: var(--accent-dim);
+        color: var(--accent);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+      }
+      .pill.pending {
+        background: rgba(245, 158, 11, 0.12);
+        color: var(--amber);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+      }
+      .pill.muted {
+        background: rgba(148, 163, 184, 0.1);
+        color: var(--text-muted);
+        border: 1px solid var(--border-bright);
+      }
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+        flex-shrink: 0;
+      }
+      .pill.live .dot {
+        animation: pulse 2s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; box-shadow: 0 0 0 0 currentColor; }
+        50% { opacity: 0.6; box-shadow: 0 0 0 4px transparent; }
+      }
+      .card {
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 12px;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+      .stat {
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+      }
+      .stat .n {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+      .stat .l {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 6px;
+        line-height: 1.3;
+      }
+      pre {
+        background: var(--bg-code);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 14px 16px;
+        overflow-x: auto;
+        margin: 0;
+        color: var(--text);
+        font-size: 12.5px;
+        line-height: 1.6;
+        -webkit-text-size-adjust: 100%;
+      }
+      pre .k { color: #93c5fd; }
+      pre .s { color: #86efac; }
+      pre .n { color: #fbbf24; }
+      pre .b { color: #c4b5fd; }
+      .rails {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .rail {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px 16px;
+      }
+      .rail.root {
+        border-color: rgba(16, 185, 129, 0.4);
+        background: linear-gradient(180deg, var(--accent-dim) 0%, var(--bg-elev) 100%);
+      }
+      .rail h3 {
+        margin: 0;
+      }
+      .rail .meta {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+      .caps {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      .cap {
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px 16px;
+      }
+      .cap .t {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+      .cap .d {
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.5;
+      }
+      ul.checks {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 8px;
+      }
+      ul.checks li {
+        padding-left: 22px;
+        position: relative;
+        font-size: 14px;
+        color: var(--text);
+      }
+      ul.checks li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 7px;
+        width: 12px;
+        height: 7px;
+        border-left: 2px solid var(--accent);
+        border-bottom: 2px solid var(--accent);
+        transform: rotate(-45deg);
+      }
+      .stack {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 4px 10px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border-bright);
+        border-radius: 6px;
+        font-size: 12px;
+        color: var(--text-muted);
+        font-family: ui-monospace, 'SF Mono', monospace;
+      }
+      footer {
+        margin-top: 64px;
+        padding-top: 24px;
+        border-top: 1px solid var(--border);
+        color: var(--text-dim);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+      footer a {
+        color: var(--indigo);
+        text-decoration: none;
+      }
+      footer a:hover {
+        text-decoration: underline;
+      }
+      .hero-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+      .skel {
+        display: inline-block;
+        background: linear-gradient(90deg, var(--bg-elev), #1c2433, var(--bg-elev));
+        background-size: 200% 100%;
+        animation: shimmer 1.4s linear infinite;
+        border-radius: 4px;
+        height: 1em;
+        width: 70%;
+      }
+      @keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+      .err {
+        color: var(--rose);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="hero-row">
+        <span id="status-pill" class="pill muted"><span class="dot"></span>checking…</span>
+        <span class="pill muted">Sandbox · v0.1.0</span>
+      </div>
+      <h1>Identiti</h1>
+      <p class="lede">
+        The identity rail underpinning Kirimon Market Ventures' platform —
+        universal account UUIDs, KYC tier signal, step-up authentication, phone
+        tokenisation, and delegated-authority signing for AI agents acting on
+        behalf of users.
+      </p>
+
+      <h2>Live system snapshot</h2>
+      <div class="card">
+        <p style="margin: 0 0 10px; font-size: 13px; color: var(--text-muted);">
+          Fetched from the deployed API at page load:
+        </p>
+        <pre id="health">Loading <span class="skel"></span></pre>
+        <p style="margin: 12px 0 0; font-size: 12.5px; color: var(--text-muted);">
+          <span class="mono" id="jwks-line">Loading JWKS…</span>
+        </p>
+      </div>
+
+      <h2>By the numbers</h2>
+      <div class="stats">
+        <div class="stat"><div class="n">10</div><div class="l">build sprints closed</div></div>
+        <div class="stat"><div class="n">164</div><div class="l">tests passing</div></div>
+        <div class="stat"><div class="n">13</div><div class="l">Postgres tables (RLS on all)</div></div>
+        <div class="stat"><div class="n">30+</div><div class="l">API endpoints live</div></div>
+        <div class="stat"><div class="n">2</div><div class="l">RS256 signing keys (JWKS)</div></div>
+        <div class="stat"><div class="n">9</div><div class="l">DB migrations applied</div></div>
+      </div>
+
+      <h2>The four-rail platform</h2>
+      <div class="rails">
+        <div class="rail root">
+          <div>
+            <h3>Identiti</h3>
+            <div class="meta">Identity · KYC · step-up · phone tokens · delegated authority</div>
+          </div>
+          <span class="pill live"><span class="dot"></span>Live</span>
+        </div>
+        <div class="rail">
+          <div>
+            <h3>Kipkiren Pay</h3>
+            <div class="meta">Payments · e-money · M-Pesa · CBK-regulated</div>
+          </div>
+          <span class="pill pending"><span class="dot"></span>In build</span>
+        </div>
+        <div class="rail">
+          <div>
+            <h3>Todoku</h3>
+            <div class="meta">SMS · voice · WhatsApp · vendor-routed</div>
+          </div>
+          <span class="pill pending"><span class="dot"></span>In build</span>
+        </div>
+        <div class="rail">
+          <div>
+            <h3>Helpan AI</h3>
+            <div class="meta">Agent runtime · delegated authority · audit</div>
+          </div>
+          <span class="pill pending"><span class="dot"></span>In build</span>
+        </div>
+      </div>
+
+      <h2>What this rail does today</h2>
+      <div class="caps">
+        <div class="cap">
+          <div class="t">Account UUID</div>
+          <div class="d">Universal foreign key issued at customer creation. <code class="mono">acc_&lt;uuid v4&gt;</code>. Every other rail keys off it.</div>
+        </div>
+        <div class="cap">
+          <div class="t">KYC + tier system</div>
+          <div class="d">Three tiers (0/1/2). IPRS verification stub. Operator-mediated promotions. Hash-chained KYC artefacts.</div>
+        </div>
+        <div class="cap">
+          <div class="t">Step-up authentication</div>
+          <div class="d">RS256 JWTs, single-use, audience-bound, 60s–10min TTLs by risk tier. Public JWKS for relying parties.</div>
+        </div>
+        <div class="cap">
+          <div class="t">Phone tokenisation</div>
+          <div class="d">Apps never see raw MSISDNs. HS256 phone tokens resolved via a Todoku-internal scope; AES-256-GCM ciphertext only.</div>
+        </div>
+        <div class="cap">
+          <div class="t">Phone-change flow</div>
+          <div class="d">Two-OTP verification, cooldown-enforced, step-up gated. <code class="mono">PHONE_CHANGED</code> published cross-rail.</div>
+        </div>
+        <div class="cap">
+          <div class="t">Operator console</div>
+          <div class="d">Suspend/reactivate, tier override, KYC review queue + approve/reject, audit-log read.</div>
+        </div>
+        <div class="cap">
+          <div class="t">Delegated-authority signing</div>
+          <div class="d">RS256 token issuance for AI agents acting on a user's behalf, jointly designed with the Helpan AI rail.</div>
+        </div>
+        <div class="cap">
+          <div class="t">Tier history</div>
+          <div class="d">Customer-facing paginated history of every tier assignment, with the partial-unique index enforcing data integrity.</div>
+        </div>
+      </div>
+
+      <h2>Engineering posture</h2>
+      <ul class="checks">
+        <li>HMAC-SHA-256 service auth + scope-based authorisation on every endpoint</li>
+        <li>Hash-chained audit log (SHA-256 chain, 7-year retention)</li>
+        <li>Row-level security on every database table</li>
+        <li>AES-256-GCM phone encryption; PBKDF2 (100k iterations) phone-hash</li>
+        <li>Single-use JWT enforcement via JTI tracking + partial-unique indexes</li>
+        <li>TypeScript strict mode, Drizzle ORM, AJV (JSON Schema 2020-12)</li>
+        <li>ESLint + Prettier wired; CI runs lint → format → typecheck → test → build</li>
+        <li>Reproducible deploys: Nixpacks, pinned pnpm, `pnpm install --frozen-lockfile`</li>
+      </ul>
+
+      <h2>Stack</h2>
+      <div class="stack">
+        <span class="badge">Node.js 22</span>
+        <span class="badge">TypeScript 5</span>
+        <span class="badge">Fastify 4</span>
+        <span class="badge">Postgres 17</span>
+        <span class="badge">Supabase</span>
+        <span class="badge">Railway</span>
+        <span class="badge">Drizzle ORM</span>
+        <span class="badge">Kafka</span>
+        <span class="badge">jose</span>
+        <span class="badge">Vitest</span>
+      </div>
+
+      <footer>
+        <p style="margin: 0;">
+          Repo: <a href="https://github.com/whyyam1/identiti" target="_blank" rel="noopener">github.com/whyyam1/identiti</a>
+        </p>
+        <p style="margin: 6px 0 0;">
+          Identiti rail · sandbox deployment · <span id="now">today</span>
+        </p>
+      </footer>
+    </main>
+
+    <script>
+      // Render JSON with simple inline syntax highlighting.
+      function highlight(obj) {
+        return JSON.stringify(obj, null, 2)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/"([^"\\]*(?:\\.[^"\\]*)*)"(\s*:)/g, '<span class="k">"$1"</span>$2')
+          .replace(/: "([^"\\]*(?:\\.[^"\\]*)*)"/g, ': <span class="s">"$1"</span>')
+          .replace(/: (true|false|null)\b/g, ': <span class="b">$1</span>')
+          .replace(/: (-?\d+(?:\.\d+)?)\b/g, ': <span class="n">$1</span>');
+      }
+
+      const statusEl = document.getElementById('status-pill');
+      const healthEl = document.getElementById('health');
+      const jwksEl = document.getElementById('jwks-line');
+      const nowEl = document.getElementById('now');
+      nowEl.textContent = new Date().toLocaleDateString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric'
+      });
+
+      async function loadHealth() {
+        try {
+          const r = await fetch('/v1/health', { cache: 'no-store' });
+          const j = await r.json();
+          if (r.ok && j.ok) {
+            statusEl.className = 'pill live';
+            statusEl.innerHTML = '<span class="dot"></span>Live';
+          } else {
+            statusEl.className = 'pill pending';
+            statusEl.innerHTML = '<span class="dot"></span>Degraded';
+          }
+          healthEl.innerHTML = highlight(j);
+        } catch (e) {
+          statusEl.className = 'pill pending';
+          statusEl.innerHTML = '<span class="dot"></span>Unreachable';
+          healthEl.innerHTML = '<span class="err">Could not reach the API.</span>';
+        }
+      }
+
+      async function loadJwks() {
+        try {
+          const r = await fetch('/.well-known/jwks.json', { cache: 'no-store' });
+          const j = await r.json();
+          const kids = (j.keys || []).map((k) => k.kid).filter(Boolean);
+          if (kids.length > 0) {
+            jwksEl.textContent =
+              kids.length + ' RS256 key(s) in JWKS · kids: ' + kids.join(' · ');
+          } else {
+            jwksEl.textContent = 'JWKS returned no keys.';
+          }
+        } catch (e) {
+          jwksEl.innerHTML = '<span class="err">JWKS unreachable.</span>';
+        }
+      }
+
+      loadHealth();
+      loadJwks();
+    </script>
+  </body>
+</html>

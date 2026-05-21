@@ -27,6 +27,7 @@ import { phoneTokensRoutes } from './routes/phoneTokens.js';
 import { phoneChangeRoutes } from './routes/phoneChange.js';
 import { kycRoutes } from './routes/kyc.js';
 import { internalRoutes } from './routes/internal.js';
+import { demoRoutes } from './routes/demo.js';
 import type { Env } from './config/env.js';
 import type { Logger } from './lib/logger.js';
 import type {
@@ -78,7 +79,7 @@ export interface AppDeps {
 
 export type App = Awaited<ReturnType<typeof buildApp>>;
 
-const EXEMPT_PATHS = ['/v1/health', '/.well-known/jwks.json'] as const;
+const EXEMPT_PATHS = ['/v1/health', '/.well-known/jwks.json', '/', '/demo'] as const;
 
 export async function buildApp(deps: AppDeps) {
   const app = Fastify({
@@ -116,6 +117,7 @@ export async function buildApp(deps: AppDeps) {
 
   await app.register(healthRoutes(deps.env));
   await app.register(jwksRoutes({ keys: deps.jwtKeys }));
+  await app.register(demoRoutes({ logger: deps.logger }));
   await app.register(
     customersRoutes({
       customersRepo: deps.customersRepo,
