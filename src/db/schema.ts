@@ -99,6 +99,9 @@ export const platformAccounts = pgTable(
     marketingConsent: boolean('marketing_consent').notNull().default(false),
     consentCapturedVia: text('consent_captured_via').notNull(),
     lastActiveAt: timestamp('last_active_at', { withTimezone: true }),
+    // ID-12 (Q1 confirmed orthogonal): rider verification dimension layered
+    // on top of the financial 3-tier model. 'none' / 'rider_tier_1' / 'rider_tier_2'.
+    riderClass: text('rider_class').notNull().default('none'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -272,6 +275,61 @@ export const stepUpTokens = pgTable(
     delegatedAuthorityIdx: index('step_up_tokens_delegated_authority_idx').on(
       t.delegatedAuthorityJti,
     ),
+  }),
+);
+
+// ─── ID-12 — rider-KYC submissions + artefacts ───────────────────────────
+
+export const riderKycSubmissions = pgTable(
+  'rider_kyc_submissions',
+  {
+    id: text('id').primaryKey(),
+    accountUuid: text('account_uuid').notNull(),
+    state: text('state').notNull(),
+    riderClass: text('rider_class').notNull().default('none'),
+    rejectionReason: text('rejection_reason'),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    rejectedAt: timestamp('rejected_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    accountStateIdx: index('rider_kyc_submissions_account_state_idx').on(
+      t.accountUuid,
+      t.state,
+      t.submittedAt,
+    ),
+  }),
+);
+
+export const riderKycArtefacts = pgTable(
+  'rider_kyc_artefacts',
+  {
+    id: text('id').primaryKey(),
+    submissionId: text('submission_id').notNull(),
+    accountUuid: text('account_uuid').notNull(),
+    kind: text('kind').notNull(),
+    state: text('state').notNull(),
+    licenceNumberHash: text('licence_number_hash'),
+    bikeRegistrationHash: text('bike_registration_hash'),
+    mpesaMsisdnHash: text('mpesa_msisdn_hash'),
+    imageRef: text('image_ref'),
+    licenceClass: text('licence_class'),
+    licenceExpiry: timestamp('licence_expiry', { withTimezone: true }),
+    bikeMake: text('bike_make'),
+    bikeModel: text('bike_model'),
+    insurancePolicyNumber: text('insurance_policy_number'),
+    insuranceExpiry: timestamp('insurance_expiry', { withTimezone: true }),
+    vendorRef: text('vendor_ref'),
+    failureReason: text('failure_reason'),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    rejectedAt: timestamp('rejected_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    submissionIdx: index('rider_kyc_artefacts_submission_idx').on(t.submissionId),
   }),
 );
 

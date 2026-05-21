@@ -39,6 +39,8 @@ export interface CustomerRow {
   state: AccountState;
   tier: Tier;
   tierAssignedAt: Date | null;
+  /** ID-12 (Q1 orthogonal): rider verification dimension. Default 'none'. */
+  riderClass: RiderClass;
   createdAt: Date;
   lastActiveAt: Date | null;
 }
@@ -127,6 +129,8 @@ export interface CustomersRepo {
   ): Promise<StateChangeResult | null>;
   getTier(accountUuid: string): Promise<TierSnapshot | null>;
   setTier(accountUuid: string, tier: Tier, reason: string): Promise<TierChangeResult | null>;
+  /** ID-12 (Q1 orthogonal): set the rider verification dimension. Returns false iff the account does not exist. */
+  setRiderClass(accountUuid: string, riderClass: RiderClass): Promise<boolean>;
   /** Schema Appendix §6.4 — paginated, newest first. Returns null if the account does not exist. */
   getTierHistory(
     accountUuid: string,
@@ -367,6 +371,117 @@ export interface KycRecordsRepo {
   markVerified(id: string, opts: { verifiedAt: Date; expiresAt: Date }): Promise<KycRecord | null>;
   /** Operator reject: pending → failed. Returns null if not found or not pending. */
   markFailed(id: string, reason: string): Promise<KycRecord | null>;
+}
+
+// ─── Rider-KYC (ID-12) ────────────────────────────────────────────────────
+// Per docs/NEWDOCS_DECISIONS.md Q1: rider verification is orthogonal to the
+// financial 3-tier model. `RiderClass` is a separate dimension on
+// platform_accounts; setting it does not move `Tier`.
+
+export type RiderClass = 'none' | 'rider_tier_1' | 'rider_tier_2';
+
+export type RiderKycArtefactKind =
+  | 'rider_driving_licence'
+  | 'rider_motorbike_registration'
+  | 'rider_mpesa_ownership_probe'
+  | 'rider_insurance';
+
+export type RiderKycArtefactState = 'pending' | 'verified' | 'rejected';
+export type RiderKycSubmissionState = 'pending' | 'verified' | 'rejected';
+
+export interface RiderKycSubmission {
+  id: string; // rks_<ULID>
+  accountUuid: string;
+  state: RiderKycSubmissionState;
+  riderClass: RiderClass;
+  rejectionReason: string | null;
+  submittedAt: Date;
+  verifiedAt: Date | null;
+  rejectedAt: Date | null;
+  expiresAt: Date | null;
+  createdAt: Date;
+}
+
+export interface RiderKycArtefact {
+  id: string; // rka_<ULID>
+  submissionId: string;
+  accountUuid: string;
+  kind: RiderKycArtefactKind;
+  state: RiderKycArtefactState;
+  licenceNumberHash: string | null;
+  bikeRegistrationHash: string | null;
+  mpesaMsisdnHash: string | null;
+  imageRef: string | null;
+  licenceClass: string | null;
+  licenceExpiry: Date | null;
+  bikeMake: string | null;
+  bikeModel: string | null;
+  insurancePolicyNumber: string | null;
+  insuranceExpiry: Date | null;
+  vendorRef: string | null;
+  failureReason: string | null;
+  verifiedAt: Date | null;
+  rejectedAt: Date | null;
+  createdAt: Date;
+}
+
+export interface RiderKycArtefactInsert {
+  id: string;
+  submissionId: string;
+  accountUuid: string;
+  kind: RiderKycArtefactKind;
+  state: RiderKycArtefactState;
+  licenceNumberHash?: string;
+  bikeRegistrationHash?: string;
+  mpesaMsisdnHash?: string;
+  imageRef?: string;
+  licenceClass?: string;
+  licenceExpiry?: Date;
+  bikeMake?: string;
+  bikeModel?: string;
+  insurancePolicyNumber?: string;
+  insuranceExpiry?: Date;
+  vendorRef?: string;
+  failureReason?: string;
+  verifiedAt?: Date;
+  rejectedAt?: Date;
+}
+
+export interface RiderKycSubmissionFull {
+  submission: RiderKycSubmission;
+  artefacts: readonly RiderKycArtefact[];
+}
+
+export interface RiderKycSubmissionInsert {
+  id: string;
+  accountUuid: string;
+  state: RiderKycSubmissionState;
+  riderClass: RiderClass;
+  rejectionReason?: string;
+  verifiedAt?: Date;
+  rejectedAt?: Date;
+  expiresAt?: Date;
+}
+
+export type RiderKycInsertOutcome =
+  | { kind: 'created'; submission: RiderKycSubmission }
+  | { kind: 'cross_account_collision'; conflictKind: 'driving_licence' | 'bike_registration' };
+
+export interface RiderKycRepo {
+  /**
+   * Atomically inserts the submission and its artefacts. The
+   * partial-unique indexes on licence + bike hashes (where state='verified')
+   * mean a collision can only happen at artefact-state='verified' insertion
+   * time. Verification stubs run server-side before this call; if any
+   * artefact is to be inserted as 'verified', the cross-account check is
+   * enforced by the index.
+   */
+  create(
+    submission: RiderKycSubmissionInsert,
+    artefacts: readonly RiderKycArtefactInsert[],
+  ): Promise<RiderKycInsertOutcome>;
+  findById(id: string): Promise<RiderKycSubmissionFull | null>;
+  listByAccount(accountUuid: string, limit?: number): Promise<readonly RiderKycSubmission[]>;
 }
 
 // ─── DelegatedAuthoritySigningsRepo (ID-10) ───────────────────────────────

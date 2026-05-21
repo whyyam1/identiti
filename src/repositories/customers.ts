@@ -13,6 +13,7 @@ import type { Db } from '../db/client.js';
 import { phoneRecords, platformAccounts, tierHistory } from '../db/schema.js';
 import type {
   AccountState,
+  CustomerRow,
   CustomersRepo,
   Tier,
   TierAssignment,
@@ -111,6 +112,7 @@ export function createPgCustomersRepo(db: Db): CustomersRepo {
           status: platformAccounts.status,
           tier: platformAccounts.tier,
           tierAssignedAt: platformAccounts.tierAssignedAt,
+          riderClass: platformAccounts.riderClass,
           createdAt: platformAccounts.createdAt,
           lastActiveAt: platformAccounts.lastActiveAt,
         })
@@ -124,9 +126,19 @@ export function createPgCustomersRepo(db: Db): CustomersRepo {
         state: r.status as AccountState,
         tier: r.tier as Tier,
         tierAssignedAt: r.tierAssignedAt,
+        riderClass: r.riderClass as CustomerRow['riderClass'],
         createdAt: r.createdAt,
         lastActiveAt: r.lastActiveAt,
       };
+    },
+
+    async setRiderClass(accountUuid, riderClass) {
+      const result = await db
+        .update(platformAccounts)
+        .set({ riderClass, updatedAt: sql`NOW()` })
+        .where(eq(platformAccounts.id, accountUuid))
+        .returning({ id: platformAccounts.id });
+      return result.length > 0;
     },
 
     async findByPhoneHash(phoneHash) {

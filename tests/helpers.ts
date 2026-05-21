@@ -14,6 +14,7 @@ import { createMemoryPhoneTokensRepo } from '../src/repositories/phoneTokens.mem
 import { createMemoryKycRecordsRepo } from '../src/repositories/kycRecords.memory.js';
 import { createMemoryPhoneChangesRepo } from '../src/repositories/phoneChanges.memory.js';
 import { createMemoryDelegatedAuthoritySigningsRepo } from '../src/repositories/delegatedAuthoritySignings.memory.js';
+import { createMemoryRiderKycRepo } from '../src/repositories/riderKyc.memory.js';
 import { loadOrGenerateKeys } from '../src/services/jwtKeys.js';
 import { createJwtSigner } from '../src/services/jwtSigner.js';
 import { createPhoneTokenSigner } from '../src/services/phoneTokenSigner.js';
@@ -21,6 +22,10 @@ import { createStubIprsService } from '../src/services/iprsService.js';
 import { createKycHasher } from '../src/services/kycHash.js';
 import { createStepupVerifier } from '../src/services/stepupVerifier.js';
 import { createDelegatedAuthoritySigner } from '../src/services/delegatedAuthoritySigner.js';
+import { createRiderHasher } from '../src/services/riderHash.js';
+import { createStubNtsaService } from '../src/services/ntsaService.js';
+import { createStubMpesaProbeService } from '../src/services/mpesaProbeService.js';
+import { createStubInsuranceService } from '../src/services/insuranceService.js';
 
 export const TEST_APP_ID = 'identiti_test_app';
 export const TEST_HMAC_SECRET = 'test-hmac-secret-32-bytes-of-rand';
@@ -142,6 +147,7 @@ export interface TestDepsBundle extends AppDeps {
   kycRecordsRepo: ReturnType<typeof createMemoryKycRecordsRepo>;
   phoneChangesRepo: ReturnType<typeof createMemoryPhoneChangesRepo>;
   delegatedAuthoritySigningsRepo: ReturnType<typeof createMemoryDelegatedAuthoritySigningsRepo>;
+  riderKycRepo: ReturnType<typeof createMemoryRiderKycRepo>;
   iprsService: ReturnType<typeof createStubIprsService>;
 }
 
@@ -174,6 +180,11 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
     daKeys: [daKeyPair],
     expectedIssuer: 'https://api.id.identiti.co.ke',
   });
+  const riderKycRepo = createMemoryRiderKycRepo();
+  const riderHasher = createRiderHasher(TEST_KYC_HASH_SALT);
+  const ntsaService = createStubNtsaService();
+  const mpesaProbeService = createStubMpesaProbeService();
+  const insuranceService = createStubInsuranceService();
 
   return {
     env: {
@@ -212,6 +223,7 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
     kycRecordsRepo: createMemoryKycRecordsRepo(),
     phoneChangesRepo: createMemoryPhoneChangesRepo(),
     delegatedAuthoritySigningsRepo,
+    riderKycRepo,
     phoneCrypto: createPhoneCrypto({
       encryptionKeyHex: TEST_PHONE_ENCRYPTION_KEY,
       hashSaltHex: TEST_PHONE_HASH_SALT,
@@ -225,6 +237,10 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
     kycHasher,
     stepupVerifier,
     delegatedAuthoritySigner,
+    riderHasher,
+    ntsaService,
+    mpesaProbeService,
+    insuranceService,
     logger,
   };
 }

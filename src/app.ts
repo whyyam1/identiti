@@ -26,6 +26,7 @@ import { stepupRoutes } from './routes/stepup.js';
 import { phoneTokensRoutes } from './routes/phoneTokens.js';
 import { phoneChangeRoutes } from './routes/phoneChange.js';
 import { kycRoutes } from './routes/kyc.js';
+import { riderKycRoutes } from './routes/riderKyc.js';
 import { internalRoutes } from './routes/internal.js';
 import { demoRoutes } from './routes/demo.js';
 import type { Env } from './config/env.js';
@@ -37,6 +38,7 @@ import type {
   KycRecordsRepo,
   PhoneChangesRepo,
   PhoneTokensRepo,
+  RiderKycRepo,
   SessionsRepo,
   StepUpTokensRepo,
 } from './repositories/types.js';
@@ -50,6 +52,10 @@ import type { IprsService } from './services/iprsService.js';
 import type { KycHasher } from './services/kycHash.js';
 import type { StepupVerifier } from './services/stepupVerifier.js';
 import type { DelegatedAuthoritySigner } from './services/delegatedAuthoritySigner.js';
+import type { RiderHasher } from './services/riderHash.js';
+import type { NtsaService } from './services/ntsaService.js';
+import type { MpesaProbeService } from './services/mpesaProbeService.js';
+import type { InsuranceService } from './services/insuranceService.js';
 
 export interface AppDeps {
   env: Env;
@@ -63,6 +69,7 @@ export interface AppDeps {
   kycRecordsRepo: KycRecordsRepo;
   phoneChangesRepo: PhoneChangesRepo;
   delegatedAuthoritySigningsRepo: DelegatedAuthoritySigningsRepo;
+  riderKycRepo: RiderKycRepo;
   phoneCrypto: PhoneCrypto;
   eventProducer: EventProducer;
   auditLogger: AuditLogger;
@@ -74,6 +81,10 @@ export interface AppDeps {
   kycHasher: KycHasher;
   stepupVerifier: StepupVerifier;
   delegatedAuthoritySigner: DelegatedAuthoritySigner;
+  riderHasher: RiderHasher;
+  ntsaService: NtsaService;
+  mpesaProbeService: MpesaProbeService;
+  insuranceService: InsuranceService;
   logger: Logger;
 }
 
@@ -155,6 +166,18 @@ export async function buildApp(deps: AppDeps) {
       kycRecordsRepo: deps.kycRecordsRepo,
       iprsService: deps.iprsService,
       kycHasher: deps.kycHasher,
+      eventProducer: deps.eventProducer,
+      auditLogger: deps.auditLogger,
+    }),
+  );
+  await app.register(
+    riderKycRoutes({
+      customersRepo: deps.customersRepo,
+      riderKycRepo: deps.riderKycRepo,
+      riderHasher: deps.riderHasher,
+      ntsaService: deps.ntsaService,
+      mpesaProbeService: deps.mpesaProbeService,
+      insuranceService: deps.insuranceService,
       eventProducer: deps.eventProducer,
       auditLogger: deps.auditLogger,
     }),

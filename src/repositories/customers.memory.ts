@@ -3,7 +3,14 @@
  */
 
 import { generateUlid } from '@kmv/platform-shared';
-import type { AccountState, CustomerRow, CustomersRepo, Tier, TierAssignment } from './types.js';
+import type {
+  AccountState,
+  CustomerRow,
+  CustomersRepo,
+  RiderClass,
+  Tier,
+  TierAssignment,
+} from './types.js';
 
 const DEFAULT_HISTORY_LIMIT = 50;
 const MAX_HISTORY_LIMIT = 200;
@@ -14,6 +21,7 @@ interface StoredAccount {
   tier: Tier;
   tierAssignedAt: Date | null;
   tierReason: string | null;
+  riderClass: RiderClass;
   createdAt: Date;
   lastActiveAt: Date | null;
   phoneHash: string;
@@ -48,6 +56,7 @@ export function createMemoryCustomersRepo(): CustomersRepo {
         tier: 'tier_0',
         tierAssignedAt: null,
         tierReason: null,
+        riderClass: 'none',
         createdAt: now,
         lastActiveAt: null,
         phoneHash: input.phoneHash,
@@ -85,6 +94,7 @@ export function createMemoryCustomersRepo(): CustomersRepo {
         state: a.state,
         tier: a.tier,
         tierAssignedAt: a.tierAssignedAt,
+        riderClass: a.riderClass,
         createdAt: a.createdAt,
         lastActiveAt: a.lastActiveAt,
       };
@@ -148,6 +158,13 @@ export function createMemoryCustomersRepo(): CustomersRepo {
         assignedAt: a.tierAssignedAt ?? a.createdAt,
         reason: a.tierReason ?? 'rule_based_tier_0_default',
       };
+    },
+
+    async setRiderClass(accountUuid, riderClass) {
+      const a = accounts.get(accountUuid);
+      if (!a) return false;
+      a.riderClass = riderClass;
+      return true;
     },
 
     async setTier(accountUuid, tier, reason) {
