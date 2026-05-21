@@ -15,6 +15,7 @@ import { createMemoryKycRecordsRepo } from '../src/repositories/kycRecords.memor
 import { createMemoryPhoneChangesRepo } from '../src/repositories/phoneChanges.memory.js';
 import { createMemoryDelegatedAuthoritySigningsRepo } from '../src/repositories/delegatedAuthoritySignings.memory.js';
 import { createMemoryRiderKycRepo } from '../src/repositories/riderKyc.memory.js';
+import { createMemoryKybRepo } from '../src/repositories/kyb.memory.js';
 import { loadOrGenerateKeys } from '../src/services/jwtKeys.js';
 import { createJwtSigner } from '../src/services/jwtSigner.js';
 import { createPhoneTokenSigner } from '../src/services/phoneTokenSigner.js';
@@ -26,6 +27,8 @@ import { createRiderHasher } from '../src/services/riderHash.js';
 import { createStubNtsaService } from '../src/services/ntsaService.js';
 import { createStubMpesaProbeService } from '../src/services/mpesaProbeService.js';
 import { createStubInsuranceService } from '../src/services/insuranceService.js';
+import { createKybHasher } from '../src/services/kybHash.js';
+import { createStubBrsService } from '../src/services/brsService.js';
 
 export const TEST_APP_ID = 'identiti_test_app';
 export const TEST_HMAC_SECRET = 'test-hmac-secret-32-bytes-of-rand';
@@ -148,6 +151,7 @@ export interface TestDepsBundle extends AppDeps {
   phoneChangesRepo: ReturnType<typeof createMemoryPhoneChangesRepo>;
   delegatedAuthoritySigningsRepo: ReturnType<typeof createMemoryDelegatedAuthoritySigningsRepo>;
   riderKycRepo: ReturnType<typeof createMemoryRiderKycRepo>;
+  kybRepo: ReturnType<typeof createMemoryKybRepo>;
   iprsService: ReturnType<typeof createStubIprsService>;
 }
 
@@ -185,6 +189,9 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
   const ntsaService = createStubNtsaService();
   const mpesaProbeService = createStubMpesaProbeService();
   const insuranceService = createStubInsuranceService();
+  const kybRepo = createMemoryKybRepo();
+  const kybHasher = createKybHasher(TEST_KYC_HASH_SALT);
+  const brsService = createStubBrsService();
 
   return {
     env: {
@@ -224,6 +231,7 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
     phoneChangesRepo: createMemoryPhoneChangesRepo(),
     delegatedAuthoritySigningsRepo,
     riderKycRepo,
+    kybRepo,
     phoneCrypto: createPhoneCrypto({
       encryptionKeyHex: TEST_PHONE_ENCRYPTION_KEY,
       hashSaltHex: TEST_PHONE_HASH_SALT,
@@ -241,6 +249,8 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
     ntsaService,
     mpesaProbeService,
     insuranceService,
+    kybHasher,
+    brsService,
     logger,
   };
 }

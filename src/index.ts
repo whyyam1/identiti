@@ -23,6 +23,7 @@ import { createPgKycRecordsRepo } from './repositories/kycRecords.js';
 import { createPgPhoneChangesRepo } from './repositories/phoneChanges.js';
 import { createPgDelegatedAuthoritySigningsRepo } from './repositories/delegatedAuthoritySignings.js';
 import { createPgRiderKycRepo } from './repositories/riderKyc.js';
+import { createPgKybRepo } from './repositories/kyb.js';
 import { createDbAuditLogger } from './services/auditLogger.js';
 import {
   InMemoryEventProducer,
@@ -40,6 +41,8 @@ import { createRiderHasher } from './services/riderHash.js';
 import { createStubNtsaService } from './services/ntsaService.js';
 import { createStubMpesaProbeService } from './services/mpesaProbeService.js';
 import { createStubInsuranceService } from './services/insuranceService.js';
+import { createKybHasher } from './services/kybHash.js';
+import { createStubBrsService } from './services/brsService.js';
 import { buildApp } from './app.js';
 
 async function main(): Promise<void> {
@@ -58,11 +61,14 @@ async function main(): Promise<void> {
   const phoneChangesRepo = createPgPhoneChangesRepo(db);
   const delegatedAuthoritySigningsRepo = createPgDelegatedAuthoritySigningsRepo(db);
   const riderKycRepo = createPgRiderKycRepo(db);
+  const kybRepo = createPgKybRepo(db);
   const kycHasher = createKycHasher(env.KYC_HASH_SALT);
   const riderHasher = createRiderHasher(env.KYC_HASH_SALT);
+  const kybHasher = createKybHasher(env.KYC_HASH_SALT);
   const ntsaService = createStubNtsaService();
   const mpesaProbeService = createStubMpesaProbeService();
   const insuranceService = createStubInsuranceService();
+  const brsService = createStubBrsService();
 
   // IPRS Track A access not provisioned at v1.0 build time. The stub is the
   // only impl shipped today; production must wire a real IprsService when
@@ -152,6 +158,7 @@ async function main(): Promise<void> {
     phoneChangesRepo,
     delegatedAuthoritySigningsRepo,
     riderKycRepo,
+    kybRepo,
     phoneCrypto,
     eventProducer,
     auditLogger,
@@ -166,6 +173,8 @@ async function main(): Promise<void> {
     ntsaService,
     mpesaProbeService,
     insuranceService,
+    kybHasher,
+    brsService,
     logger,
   });
 

@@ -278,6 +278,50 @@ export const stepUpTokens = pgTable(
   }),
 );
 
+// ─── ID-13 — KYB (Know Your Business) for LipaStack ───────────────────────
+
+export const kybRecords = pgTable(
+  'kyb_records',
+  {
+    id: text('id').primaryKey(),
+    state: text('state').notNull(),
+    businessName: text('business_name').notNull(),
+    businessType: text('business_type').notNull(),
+    countryCode: text('country_code').notNull().default('KE'),
+    businessRegistrationHash: text('business_registration_hash').notNull(),
+    kraPinHash: text('kra_pin_hash').notNull(),
+    rejectionReason: text('rejection_reason'),
+    pendingInfoReason: text('pending_info_reason'),
+    submittedByAppId: text('submitted_by_app_id').notNull(),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    rejectedAt: timestamp('rejected_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    stateSubmittedIdx: index('kyb_records_state_submitted_idx').on(t.state, t.submittedAt),
+  }),
+);
+
+export const kybDirectors = pgTable(
+  'kyb_directors',
+  {
+    id: text('id').primaryKey(),
+    kybId: text('kyb_id').notNull(),
+    directorAccountUuid: text('director_account_uuid').notNull(),
+    isSignatory: boolean('is_signatory').notNull().default(false),
+    ownershipPct: text('ownership_pct'),
+    kycVerifiedAtSubmit: boolean('kyc_verified_at_submit').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    kybIdx: index('kyb_directors_kyb_idx').on(t.kybId),
+    accountIdx: index('kyb_directors_account_idx').on(t.directorAccountUuid),
+  }),
+);
+
 // ─── ID-12 — rider-KYC submissions + artefacts ───────────────────────────
 
 export const riderKycSubmissions = pgTable(

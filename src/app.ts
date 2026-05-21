@@ -27,6 +27,7 @@ import { phoneTokensRoutes } from './routes/phoneTokens.js';
 import { phoneChangeRoutes } from './routes/phoneChange.js';
 import { kycRoutes } from './routes/kyc.js';
 import { riderKycRoutes } from './routes/riderKyc.js';
+import { kybRoutes } from './routes/kyb.js';
 import { internalRoutes } from './routes/internal.js';
 import { demoRoutes } from './routes/demo.js';
 import type { Env } from './config/env.js';
@@ -35,6 +36,7 @@ import type {
   AuthChallengesRepo,
   CustomersRepo,
   DelegatedAuthoritySigningsRepo,
+  KybRepo,
   KycRecordsRepo,
   PhoneChangesRepo,
   PhoneTokensRepo,
@@ -56,6 +58,8 @@ import type { RiderHasher } from './services/riderHash.js';
 import type { NtsaService } from './services/ntsaService.js';
 import type { MpesaProbeService } from './services/mpesaProbeService.js';
 import type { InsuranceService } from './services/insuranceService.js';
+import type { KybHasher } from './services/kybHash.js';
+import type { BrsService } from './services/brsService.js';
 
 export interface AppDeps {
   env: Env;
@@ -70,6 +74,7 @@ export interface AppDeps {
   phoneChangesRepo: PhoneChangesRepo;
   delegatedAuthoritySigningsRepo: DelegatedAuthoritySigningsRepo;
   riderKycRepo: RiderKycRepo;
+  kybRepo: KybRepo;
   phoneCrypto: PhoneCrypto;
   eventProducer: EventProducer;
   auditLogger: AuditLogger;
@@ -85,6 +90,8 @@ export interface AppDeps {
   ntsaService: NtsaService;
   mpesaProbeService: MpesaProbeService;
   insuranceService: InsuranceService;
+  kybHasher: KybHasher;
+  brsService: BrsService;
   logger: Logger;
 }
 
@@ -178,6 +185,17 @@ export async function buildApp(deps: AppDeps) {
       ntsaService: deps.ntsaService,
       mpesaProbeService: deps.mpesaProbeService,
       insuranceService: deps.insuranceService,
+      eventProducer: deps.eventProducer,
+      auditLogger: deps.auditLogger,
+    }),
+  );
+  await app.register(
+    kybRoutes({
+      customersRepo: deps.customersRepo,
+      kycRecordsRepo: deps.kycRecordsRepo,
+      kybRepo: deps.kybRepo,
+      kybHasher: deps.kybHasher,
+      brsService: deps.brsService,
       eventProducer: deps.eventProducer,
       auditLogger: deps.auditLogger,
     }),

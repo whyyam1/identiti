@@ -373,6 +373,84 @@ export interface KycRecordsRepo {
   markFailed(id: string, reason: string): Promise<KycRecord | null>;
 }
 
+// ─── KYB (ID-13 — LipaStack §A5.1) ────────────────────────────────────────
+
+export type KybBusinessType = 'sole_proprietor' | 'partnership' | 'company' | 'llp';
+export type KybState = 'pending' | 'verified' | 'rejected' | 'pending_info';
+
+export interface KybRecord {
+  id: string; // kyb_<ULID>
+  state: KybState;
+  businessName: string;
+  businessType: KybBusinessType;
+  countryCode: string;
+  businessRegistrationHash: string;
+  kraPinHash: string;
+  rejectionReason: string | null;
+  pendingInfoReason: string | null;
+  submittedByAppId: string;
+  submittedAt: Date;
+  verifiedAt: Date | null;
+  rejectedAt: Date | null;
+  expiresAt: Date | null;
+  createdAt: Date;
+}
+
+export interface KybDirector {
+  id: string; // kybd_<ULID>
+  kybId: string;
+  directorAccountUuid: string;
+  isSignatory: boolean;
+  ownershipPct: number | null;
+  kycVerifiedAtSubmit: boolean;
+  createdAt: Date;
+}
+
+export interface KybDirectorInsert {
+  id: string;
+  kybId: string;
+  directorAccountUuid: string;
+  isSignatory: boolean;
+  ownershipPct?: number;
+  kycVerifiedAtSubmit: boolean;
+}
+
+export interface KybRecordInsert {
+  id: string;
+  state: KybState;
+  businessName: string;
+  businessType: KybBusinessType;
+  countryCode: string;
+  businessRegistrationHash: string;
+  kraPinHash: string;
+  rejectionReason?: string;
+  pendingInfoReason?: string;
+  submittedByAppId: string;
+  verifiedAt?: Date;
+  rejectedAt?: Date;
+  expiresAt?: Date;
+}
+
+export interface KybFull {
+  record: KybRecord;
+  directors: readonly KybDirector[];
+}
+
+export type KybInsertOutcome =
+  | { kind: 'created'; record: KybRecord }
+  | {
+      kind: 'cross_account_collision';
+      conflictKind: 'business_registration' | 'kra_pin';
+    };
+
+export interface KybRepo {
+  create(
+    record: KybRecordInsert,
+    directors: readonly KybDirectorInsert[],
+  ): Promise<KybInsertOutcome>;
+  findById(id: string): Promise<KybFull | null>;
+}
+
 // ─── Rider-KYC (ID-12) ────────────────────────────────────────────────────
 // Per docs/NEWDOCS_DECISIONS.md Q1: rider verification is orthogonal to the
 // financial 3-tier model. `RiderClass` is a separate dimension on
