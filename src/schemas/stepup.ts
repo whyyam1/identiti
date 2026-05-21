@@ -29,15 +29,24 @@ const OPERATION_KIND_ENUM = [
   // act of granting delegated authority to an agent. Per Delegated Authority
   // Contract §1 ("The two compose") + §8.3.
   'helpan_ai.authority_issuance',
+  // ID-15 (LipaStack step-up audience + operation-kind catalogue) — per
+  // newdocs LipaStack tech spec §A6/§A9. Initial set; more added as LipaStack
+  // Sprint 5+ defines them.
+  'lipastack.payout.high_value',
+  'lipastack.admin.key_rotation',
+  'lipastack.merchant.dispute_decision',
   'app.custom_high_risk',
 ] as const;
 
 /**
- * Special-cased audiences that are NOT URI-shaped. The strawman names
- * `helpan_authority_issuance` as a bare audience string (Delegated Authority
- * Contract §8.3). All other audiences must validate against `format: uri`.
+ * Special-cased audiences that are NOT URI-shaped. Bare-string audiences are
+ * accepted alongside URIs by `operationAudienceSchema`. Keep this list
+ * narrow — every entry is a known cross-rail consumer.
+ *   `helpan_authority_issuance` — ID-10 H4 joint with Helpan AI.
+ *   `lipastack` — ID-15 LipaStack step-up audience (cached JWKS, 15-min TTL
+ *                 per LipaStack tech spec §A9).
  */
-const NON_URI_AUDIENCES = ['helpan_authority_issuance'] as const;
+const NON_URI_AUDIENCES = ['helpan_authority_issuance', 'lipastack'] as const;
 
 const operationAudienceSchema = {
   oneOf: [
