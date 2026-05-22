@@ -638,6 +638,58 @@ export interface PhoneTokensRepo {
   revoke(jti: string, by: string, reason: string): Promise<PhoneTokenRecord | null>;
 }
 
+// ─── ID-14 — Hakken consent surface ───────────────────────────────────────
+// Per docs/NEWDOCS_DECISIONS.md Q4 (settled): Identiti is canonical.
+// One row per (account, app, scope) grant period; open grants have
+// `revokedAt === null`. The partial-unique-index in migration 0013
+// enforces at most one open grant per tuple — re-granting an already-open
+// scope is `409 consent_grant_already_open`.
+
+export interface ConsentGrant {
+  id: string; // cgr_<ULID>
+  accountUuid: string;
+  appId: string;
+  scope: string;
+  grantedAt: Date;
+  grantedViaAppId: string;
+  revokedAt: Date | null;
+  revokedByAppId: string | null;
+  revokeReason: string | null;
+  createdAt: Date;
+}
+
+export interface ConsentGrantInsert {
+  id: string;
+  accountUuid: string;
+  appId: string;
+  scope: string;
+  grantedViaAppId: string;
+}
+
+export type ConsentGrantOutcome =
+  | { kind: 'created'; grant: ConsentGrant }
+  | { kind: 'already_open'; existing: ConsentGrant };
+
+export type ConsentRevokeOutcome =
+  | { kind: 'revoked'; grant: ConsentGrant }
+  | { kind: 'not_found' }
+  | { kind: 'already_revoked'; existing: ConsentGrant };
+
+export interface ConsentGrantsRepo {
+  create(input: ConsentGrantInsert): Promise<ConsentGrantOutcome>;
+  findById(id: string): Promise<ConsentGrant | null>;
+  /** All grants (open + revoked) for an account, newest-grant-first. */
+  listByAccount(accountUuid: string): Promise<ConsentGrant[]>;
+  /** Open grants only — what a consuming rail caches for 60s. */
+  listOpenByAccount(accountUuid: string): Promise<ConsentGrant[]>;
+  revoke(
+    id: string,
+    revokedByAppId: string,
+    revokeReason: string | null,
+    at: Date,
+  ): Promise<ConsentRevokeOutcome>;
+}
+
 // ─── ID-17 — Operator users + WebAuthn credentials ────────────────────────
 // Per docs/NEWDOCS_DECISIONS.md Q3: operator step-up is a sub-surface of
 // /v1/stepup/* with `factor=hardware_key` and `operation_kind=operator.*`.

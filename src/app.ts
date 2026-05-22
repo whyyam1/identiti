@@ -30,11 +30,13 @@ import { riderKycRoutes } from './routes/riderKyc.js';
 import { kybRoutes } from './routes/kyb.js';
 import { internalRoutes } from './routes/internal.js';
 import { operatorSessionRoutes } from './routes/operatorSession.js';
+import { consentRoutes } from './routes/consent.js';
 import { demoRoutes } from './routes/demo.js';
 import type { Env } from './config/env.js';
 import type { Logger } from './lib/logger.js';
 import type {
   AuthChallengesRepo,
+  ConsentGrantsRepo,
   CustomersRepo,
   DelegatedAuthoritySigningsRepo,
   KybRepo,
@@ -79,6 +81,8 @@ export interface AppDeps {
   delegatedAuthoritySigningsRepo: DelegatedAuthoritySigningsRepo;
   riderKycRepo: RiderKycRepo;
   kybRepo: KybRepo;
+  /** ID-14 */
+  consentGrantsRepo: ConsentGrantsRepo;
   /** ID-17 */
   operatorUsersRepo: OperatorUsersRepo;
   /** ID-17 */
@@ -254,6 +258,14 @@ export async function buildApp(deps: AppDeps) {
     operatorRoutes({
       customersRepo: deps.customersRepo,
       kycRecordsRepo: deps.kycRecordsRepo,
+      eventProducer: deps.eventProducer,
+      auditLogger: deps.auditLogger,
+    }),
+  );
+  await app.register(
+    consentRoutes({
+      customersRepo: deps.customersRepo,
+      consentGrantsRepo: deps.consentGrantsRepo,
       eventProducer: deps.eventProducer,
       auditLogger: deps.auditLogger,
     }),

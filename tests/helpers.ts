@@ -16,6 +16,7 @@ import { createMemoryPhoneChangesRepo } from '../src/repositories/phoneChanges.m
 import { createMemoryDelegatedAuthoritySigningsRepo } from '../src/repositories/delegatedAuthoritySignings.memory.js';
 import { createMemoryRiderKycRepo } from '../src/repositories/riderKyc.memory.js';
 import { createMemoryKybRepo } from '../src/repositories/kyb.memory.js';
+import { createMemoryConsentGrantsRepo } from '../src/repositories/consentGrants.memory.js';
 import { createMemoryOperatorUsersRepo } from '../src/repositories/operatorUsers.memory.js';
 import { createMemoryOperatorWebauthnCredentialsRepo } from '../src/repositories/operatorWebauthnCredentials.memory.js';
 import { loadOrGenerateKeys } from '../src/services/jwtKeys.js';
@@ -79,6 +80,10 @@ export function makeMemCredStore(opts: { suspended?: boolean } = {}): AppCredent
               'identiti:stepup:request',
               'identiti:stepup:verify',
               'identiti:tier:read',
+              // ID-14: a user-facing app records consent grants on the
+              // user's behalf, and can read what's open.
+              'identiti:consent:read',
+              'identiti:consent:write',
             ],
             status: opts.suspended ? 'suspended' : 'active',
           },
@@ -163,6 +168,7 @@ export interface TestDepsBundle extends AppDeps {
   delegatedAuthoritySigningsRepo: ReturnType<typeof createMemoryDelegatedAuthoritySigningsRepo>;
   riderKycRepo: ReturnType<typeof createMemoryRiderKycRepo>;
   kybRepo: ReturnType<typeof createMemoryKybRepo>;
+  consentGrantsRepo: ReturnType<typeof createMemoryConsentGrantsRepo>;
   operatorUsersRepo: ReturnType<typeof createMemoryOperatorUsersRepo>;
   operatorWebauthnCredentialsRepo: ReturnType<
     typeof createMemoryOperatorWebauthnCredentialsRepo
@@ -207,6 +213,7 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
   const kybRepo = createMemoryKybRepo();
   const kybHasher = createKybHasher(TEST_KYC_HASH_SALT);
   const brsService = createStubBrsService();
+  const consentGrantsRepo = createMemoryConsentGrantsRepo();
   const operatorUsersRepo = createMemoryOperatorUsersRepo();
   const operatorWebauthnCredentialsRepo = createMemoryOperatorWebauthnCredentialsRepo();
   const webauthnAdapter = createStubWebauthnAdapter({
@@ -255,6 +262,7 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
     delegatedAuthoritySigningsRepo,
     riderKycRepo,
     kybRepo,
+    consentGrantsRepo,
     operatorUsersRepo,
     operatorWebauthnCredentialsRepo,
     webauthnAdapter,

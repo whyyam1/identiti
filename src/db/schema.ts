@@ -312,6 +312,28 @@ export const operatorUsers = pgTable(
   }),
 );
 
+// ─── ID-14 — Hakken consent surface ───────────────────────────────────────
+
+export const consentGrants = pgTable(
+  'consent_grants',
+  {
+    id: text('id').primaryKey(),
+    accountUuid: text('account_uuid').notNull(),
+    appId: text('app_id').notNull(),
+    scope: text('scope').notNull(),
+    grantedAt: timestamp('granted_at', { withTimezone: true }).notNull().defaultNow(),
+    grantedViaAppId: text('granted_via_app_id').notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    revokedByAppId: text('revoked_by_app_id'),
+    revokeReason: text('revoke_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    accountIdx: index('consent_grants_account_idx').on(t.accountUuid, t.grantedAt),
+    appIdx: index('consent_grants_app_idx').on(t.appId, t.grantedAt),
+  }),
+);
+
 export const operatorWebauthnCredentials = pgTable(
   'operator_webauthn_credentials',
   {

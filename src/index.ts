@@ -24,6 +24,7 @@ import { createPgPhoneChangesRepo } from './repositories/phoneChanges.js';
 import { createPgDelegatedAuthoritySigningsRepo } from './repositories/delegatedAuthoritySignings.js';
 import { createPgRiderKycRepo } from './repositories/riderKyc.js';
 import { createPgKybRepo } from './repositories/kyb.js';
+import { createPgConsentGrantsRepo } from './repositories/consentGrants.js';
 import { createPgOperatorUsersRepo } from './repositories/operatorUsers.js';
 import { createPgOperatorWebauthnCredentialsRepo } from './repositories/operatorWebauthnCredentials.js';
 import { createDbAuditLogger } from './services/auditLogger.js';
@@ -65,6 +66,7 @@ async function main(): Promise<void> {
   const delegatedAuthoritySigningsRepo = createPgDelegatedAuthoritySigningsRepo(db);
   const riderKycRepo = createPgRiderKycRepo(db);
   const kybRepo = createPgKybRepo(db);
+  const consentGrantsRepo = createPgConsentGrantsRepo(db);
   const operatorUsersRepo = createPgOperatorUsersRepo(db);
   const operatorWebauthnCredentialsRepo = createPgOperatorWebauthnCredentialsRepo(db);
   const kycHasher = createKycHasher(env.KYC_HASH_SALT);
@@ -177,6 +179,7 @@ async function main(): Promise<void> {
     delegatedAuthoritySigningsRepo,
     riderKycRepo,
     kybRepo,
+    consentGrantsRepo,
     operatorUsersRepo,
     operatorWebauthnCredentialsRepo,
     webauthnAdapter,
