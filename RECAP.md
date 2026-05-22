@@ -26,44 +26,47 @@
 
 ## 1.1 Next session — start here
 
-Code state as of 15 May 2026: **ID-1..ID-10 closed**, 147/147 tests pass, typecheck clean. Customer-facing identity surface complete; operator console covers all Phase 9 endpoints; ID-10 H4 joint with Helpan AI shipped (`POST /v1/internal/sign`, delegated-authority key class, `helpan_authority_issuance` audience, request-side `actor`/`initiated_by`). Sandbox DB live on Supabase (`tjqpyblyoslyoplmnlua`, eu-west-1; migrations 0001–0008 applied). Every locally-buildable Identiti sprint is now done.
+Code state as of 22 May 2026: **ID-1..ID-10 closed; ID-12, ID-13, ID-15, ID-17 closed** (the four newdocs sprints with net-new Identiti code). **217/217 tests pass; typecheck + lint clean.** Migrations 0001–0012 applied live to Supabase (`tjqpyblyoslyoplmnlua`, eu-west-1); 19 tables, RLS on all. Customer-facing identity surface complete (auth, KYC + IPRS, rider-KYC, KYB, step-up, phone tokens, phone change, tier signal + history). Operator console covers all Phase 9 endpoints. ID-10 H4 joint with Helpan AI shipped (`POST /v1/internal/sign`, delegated-authority key class, `helpan_authority_issuance` audience, request-side `actor`/`initiated_by`). ID-17 ships operator-user identity (`opu_<ULID>`) + WebAuthn stub adapter + `factor=hardware_key` end-to-end on `/v1/stepup/*` + 9 `operator.<rail>.<action>` operation_kinds.
 
-**Cross-rail state as of 15 May 2026** (per [`../Platform Rails-instruction pack v1-reboot pack v1.2/RECAP.md`](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/RECAP.md) §1.3):
+**Cross-rail unblocks shipped so far:** Helpan AI H-3 (ID-10), Itafika MVP (ID-12), LipaStack Sprint 1 (ID-13), LipaStack audiences (ID-15), and all four operator-console surfaces — Todoku TD-Beta, Itafika ops, KWS Amara, LipaStack admin (ID-17).
 
-- **Helpan AI H-3 is now UNBLOCKED.** ID-10 shipped the joint signing surface H-3 was hard-blocked on. The H4 sign-off memo is at [`docs/H4_HELPAN_AI_JOINT.md`](docs/H4_HELPAN_AI_JOINT.md) — that's what Helpan AI engineering reads to build H-3 against. Be available for H-3 integration questions.
-- **Kipkiren Pay:** still ❌ not started (KP-1 [ ]). When KP-2 / KP-4 start they consume `TIER_CHANGED` + the JWKS — be available.
-- **Todoku:** TD-1 in flight. TD-2 will consume `STEP_UP_REQUIRED` (now optionally carrying `actor`/`initiated_by` from ID-10).
+**Cross-rail state to verify before the next sprint** (re-read [`../Platform Rails-instruction pack v1-reboot pack v1.2/RECAP.md`](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/RECAP.md) §1.3):
 
-**Pick a track — nothing on this rail is blocker-free critical-path anymore:**
+- **Helpan AI:** H-3 was unblocked by ID-10 on 15 May; check whether it has built against `docs/H4_HELPAN_AI_JOINT.md` yet.
+- **Itafika / LipaStack:** new — ID-12 + ID-13 close their week-4 / Sprint-1 dependencies. Have they started consuming the surfaces?
+- **Kipkiren Pay:** was ❌ not started at last check (KP-1 [ ]). When KP-2 / KP-4 start they consume `TIER_CHANGED` + the JWKS.
+- **Todoku:** TD-1 in flight at last check. TD-2 will consume `STEP_UP_REQUIRED` (carrying either OTP plaintext or, for `factor=hardware_key`, the WebAuthn challenge bytes from ID-17).
+- **Hakken:** HK-0 not started yet. **ID-14 (consent surface) is the joint sprint** — design session with Hakken before HK-0; Identiti is canonical per Q4.
 
-- **(A) Operational hardening before Stage 1 — ✅ DONE (18 May 2026).** ESLint 9 flat config + Prettier wired; `.github/workflows/ci.yml` runs lint → format:check → typecheck → test → build on push/PR. Codebase normalised with Prettier. Closes the Instruction Pack §1 / §14 checklist item.
-- **(B) Railway deploy — ✅ DONE (dev mode, 15 May 2026).** Identiti builds on Railway from `whyyam1/identiti` and runs against the Supabase DB; `/v1/health` green. `@kmv/platform-shared` was vendored to make the repo self-contained. **Remaining sub-tasks:**
-  - ~~**Tenant seeding**~~ — ✅ DONE (18 May 2026). 4 sandbox tenants seeded via `pnpm db:seed` (`scripts/seed-tenants.ts`); `app_credentials` populated, the API authenticates.
-  - **`staging` hardening** — ⏳ prepared 18 May 2026, awaiting the Railway cutover (operator action). RSA-2048 keypairs generated to `secrets/`; `secrets/railway-staging.env` is the paste-ready `NODE_ENV=staging` variable block; config-load verified. **Operator step:** Railway → Variables → Raw Editor → replace with that block → redeploy → confirm `/v1/health` shows `"environment":"staging"`.
-  - **Rotate exposed secrets** — the Supabase DB password, the four sandbox crypto keys, and the four tenant HMAC secrets were surfaced in chat; regenerate before this is anything more than a throwaway sandbox. The DB has no customer data yet, so the crypto keys are still safely rotatable (per `docs/runbooks/key-and-secret-rotation.md §4`) — do it as part of the staging cutover.
-  - Custom domain (`sandbox.id.identiti.co.ke` per [Reboot Pack §16.8](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/Platform_Rails_Reboot_Pack_v1_2.md)) + a real Kafka cluster — later.
-- **(C) ID-11 cross-rail integration testing** — unblocks once KP / Todoku reach Sprint 5+. Not yet.
-- **(D) Backlog code items** — none on the critical path:
-  - ~~`POST /v1/stepup/tokens/validate`~~ — ✅ DONE 19 May 2026 (diagnostic, non-consuming; `stepupVerifier.inspect()`; 8 tests).
-  - ~~`GET /v1/customers/:uuid/tier/history`~~ — ✅ DONE 20 May 2026 (Schema Appendix §6.4; new `tier_history` table + migration 0009; initial assignment seeded on customer creation, close+open on `setTier` enforced by a partial-unique index; cursor pagination; 9 tests).
-  - ~~Customer-facing tier-promotion request~~ — **out of v1 scope per Reboot Pack §ID-D-10** ("customer self-serve tier promotion" excluded). Do not build.
-  - JWKS multi-key **rotation orchestrator** — JWKS now publishes 2 keys; the 90-day rotation/overlap orchestration is still manual (`JWT_DA_KID` + PEM swap). Fuzzy scope — defer until rotation is actually due.
-  - Factor-upgrade rules in `/v1/stepup/challenges` (very_high → hardware_key) — **blocked**: needs a `hardware_key` factor adapter, which v1.0 doesn't have (the route rejects non-`phone_otp` factors up front).
-  - §8.5 v1.1 cascade events (`ACCOUNT_DELETED`, `CONSENT_REVOKED`) + §8.4 CAEP — v1.1 roadmap, deferred per `docs/H4_HELPAN_AI_JOINT.md`.
-  - **All clean buildable backlog items now shipped.** What remains is either explicitly out of v1, blocked on a non-existent adapter, or v1.1 roadmap.
+**What can still be built on Identiti** (in descending priority):
 
-**Standing rules to keep in mind** (from the user's CLAUDE.md and [Reboot Pack §16.10](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/Platform_Rails_Reboot_Pack_v1_2.md)):
+- **(A) ID-14 — Hakken consent surface.** Only net-new code sprint left in the newdocs pack. Identiti canonical per `NEWDOCS_DECISIONS.md` Q4. New `consent_grants` table with partial-unique-index ("one open grant per (account, app, scope)"), new `identiti.consent.events` topic (`consent_granted`/`consent_revoked`/`scope_degraded`), `GET /v1/consent/:user_uuid`, webhook delivery (reuse Helpan AI HMAC pattern), 60s consumer cache. Needs a joint design session with Hakken before HK-0; build during HK-3/HK-4. **Confirm joint session is desired before starting.**
+- **(B) `staging` Railway cutover** — ⏳ prepared 18 May 2026, awaiting operator action. RSA-2048 keypairs generated to `secrets/` (gitignored); `secrets/railway-staging.env` is the paste-ready `NODE_ENV=staging` variable block; config-load verified. **Operator step:** Railway → Variables → Raw Editor → replace with that block → redeploy → confirm `/v1/health` shows `"environment":"staging"`. Rotate exposed secrets (the DB password, the four sandbox crypto keys, the four tenant HMAC secrets surfaced in chat) as part of the cutover — `docs/runbooks/key-and-secret-rotation.md §4`. The DB has no customer data yet, so still safely rotatable.
+- **(C) ID-16 — KWS delegation contract.** **Zero net-new Identiti code per Q6** (Helpan AI signs). When KWS-S10 starts, write a short `docs/KWS_PHASE2_DELEGATION.md` capturing the joint contract. Paper-only on this rail.
+- **(D) ID-17 Phase 2 — real WebAuthn crypto adapter.** Drop in `@simplewebauthn/server` (or equivalent) behind the existing `WebauthnAdapter` interface; CBOR-parse the attestation object; verify the assertion signature against the stored credential public key. Route layer is unchanged. **Blocked on:** an operator console UI being wired up + FIDO2 hardware procurement (Track A). The stub adapter ships today and unblocks the four downstream rails immediately.
+- **(E) ID-11 cross-rail integration testing** — execution blocked (KP not started, Todoku not deployed). Plan + 5 fixtures already in Supabase (see [`docs/CROSS_RAIL_TEST_PLAN.md`](docs/CROSS_RAIL_TEST_PLAN.md)). When KP/Todoku/Helpan AI sandboxes come up: hand them the fixture Account UUIDs and run §3 of the plan.
+- **(F) Backlog code items** — all clean items already shipped:
+  - ~~`POST /v1/stepup/tokens/validate`~~ — ✅ DONE 19 May.
+  - ~~`GET /v1/customers/:uuid/tier/history`~~ — ✅ DONE 20 May.
+  - **Factor-upgrade rules** in `/v1/stepup/challenges` (`very_high` → hardware_key) — **was adapter-blocked; now unblocked by ID-17**, but the route currently still rejects `hardware_key` for non-`operator.*` operation_kinds. A real customer-side hardware_key factor needs the Phase 2 WebAuthn adapter + a per-customer credential registry — defer until customers actually carry FIDO2 hardware.
+  - JWKS multi-key **rotation orchestrator** — manual today; defer until rotation is actually due (90d cadence).
+  - ~~Customer-facing tier-promotion request~~ — **out of v1 scope** per Reboot Pack §ID-D-10.
+  - §8.5 v1.1 cascade events (`ACCOUNT_DELETED`, `CONSENT_REVOKED`) + §8.4 CAEP — v1.1 roadmap.
+- **(G) ID-Beta** — Stage-2 gated. Runbooks ready, DR drill + load test + pen-test need the staging cutover + an external firm.
+- **(H) ID-GA** — Stage-3 gated. ODPC + DPA 2019 + H14. Compliance/Legal work, not code.
+
+**Standing rules** (from CLAUDE.md and [Reboot Pack §16.10](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/Platform_Rails_Reboot_Pack_v1_2.md)):
 
 - Confirm scope before significant changes.
 - Code as files only, never chat blocks.
 - KES minor units only — no floating point (irrelevant here; KP's concern).
-- Account UUID format: `acc_<uuid v4>`.
-- Auth: Bearer JWT for customer-side; HMAC-SHA-256 + mTLS for service-side.
+- Account UUID format: `acc_<uuid v4>`; operator user format: `opu_<ULID>` (ID-17).
+- Auth: Bearer JWT for customer-side; HMAC-SHA-256 + mTLS for service-side; FIDO2/WebAuthn (hardware_key factor) for operator step-up.
 - Cardinal rule: Identiti owns identity. Does NOT hold funds, send messages, or initiate financial operations.
 - **JIT identity posture** ([Reboot Pack §A.1](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/Platform_Rails_Reboot_Pack_v1_2.md)) — no long-lived bearer tokens, no static service accounts, no refresh on elevated scopes.
 - **Commits:** no `Co-Authored-By: Claude` trailer, no "Generated with Claude Code" footer (user instruction, 15 May 2026).
 
-**Recommended first action:** complete the `staging` cutover — it's prepared (keys generated, `secrets/railway-staging.env` ready, config-load verified); the only remaining step is the operator pasting the block into Railway and redeploying. After that, every blocker-free item on this rail is done — what's left (ID-11, ID-Beta, ID-GA) is all external-gated.
+**Recommended first action:** start with **(B) staging cutover** (operator action — paste-ready), then check cross-rail status to choose between **(A) ID-14** (needs joint design with Hakken) and **(D) ID-17 Phase 2** (needs operator console UI + FIDO2 hardware). If neither is ready, every blocker-free item on this rail is now done.
 
 ---
 
