@@ -26,7 +26,15 @@
 
 ## 1.1 Next session — start here
 
-Code state as of 22 May 2026: **ID-1..ID-10 closed; all six newdocs sprints (ID-12, ID-13, ID-14, ID-15, ID-16, ID-17) closed** — ID-14 + ID-17 shipped Phase 1 of 2 (Phase 2 follow-ups noted in each row); ID-16 is paper-only. **233/233 tests pass; typecheck + lint clean.** Migrations 0001–0013 applied live to Supabase (`tjqpyblyoslyoplmnlua`, eu-west-1); 20 tables, RLS on all. Customer-facing identity surface complete (auth, KYC + IPRS, rider-KYC, KYB, step-up, phone tokens, phone change, tier signal + history). Operator console covers all Phase 9 endpoints. ID-10 H4 joint with Helpan AI shipped (`POST /v1/internal/sign`, delegated-authority key class, `helpan_authority_issuance` audience, request-side `actor`/`initiated_by`). ID-17 ships operator-user identity (`opu_<ULID>`) + WebAuthn stub adapter + `factor=hardware_key` end-to-end on `/v1/stepup/*` + 9 `operator.<rail>.<action>` operation_kinds.
+**Sprint score (22 May 2026): 14 of 17 closed; 3 open, all external-gated.**
+
+| Closed (14) | Open / blocked (3) |
+|---|---|
+| ID-1..ID-10 (foundation through ID-10 H4 joint) | **ID-11** — exec-blocked on KP / Todoku live |
+| ID-12 (rider-KYC) · ID-13 (KYB) · ID-15 (LipaStack audiences) | **ID-Beta** — Stage-2 gate (pen-test firm + DR drill) |
+| ID-14 Ph1 (consent) · ID-16 (paper) · ID-17 Ph1 (operator FIDO2 stub) | **ID-GA** — Stage-3 gate (ODPC + DPA + H14) |
+
+Code state: **233/233 tests pass; typecheck + lint clean.** Migrations 0001–0013 applied live to Supabase (`tjqpyblyoslyoplmnlua`, eu-west-1); 20 tables, RLS on all. Customer-facing identity surface complete (auth, KYC + IPRS, rider-KYC, KYB, step-up, phone tokens, phone change, tier signal + history). Operator console covers all Phase 9 endpoints. ID-10 H4 joint with Helpan AI shipped (`POST /v1/internal/sign`, delegated-authority key class, `helpan_authority_issuance` audience, request-side `actor`/`initiated_by`). ID-17 ships operator-user identity (`opu_<ULID>`) + WebAuthn stub adapter + `factor=hardware_key` end-to-end on `/v1/stepup/*` + 9 `operator.<rail>.<action>` operation_kinds. ID-14 ships `/v1/consent/*` + `identiti.consent.events` Kafka topic (Phase 1 — webhook delivery deferred to Phase 2 after Hakken joint).
 
 **Cross-rail unblocks shipped so far:** Helpan AI H-3 (ID-10), Itafika MVP (ID-12), LipaStack Sprint 1 (ID-13), Hakken HK-3/HK-4 cache-and-invalidate via Kafka (ID-14 Phase 1), LipaStack audiences (ID-15), KWS Phase 2 contract (ID-16 paper), and all four operator-console surfaces — Todoku TD-Beta, Itafika ops, KWS Amara, LipaStack admin (ID-17).
 
@@ -65,7 +73,10 @@ Code state as of 22 May 2026: **ID-1..ID-10 closed; all six newdocs sprints (ID-
 - **JIT identity posture** ([Reboot Pack §A.1](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/Platform_Rails_Reboot_Pack_v1_2.md)) — no long-lived bearer tokens, no static service accounts, no refresh on elevated scopes.
 - **Commits:** no `Co-Authored-By: Claude` trailer, no "Generated with Claude Code" footer (user instruction, 15 May 2026).
 
-**Recommended first action:** start with **(A) staging cutover** (operator action — paste-ready). After that, every Phase-1 item on this rail is done. The next Identiti code work needs an external prereq — either the Hakken joint design session (unblocks ID-14 Phase 2), the operator console UI + FIDO2 hardware (unblocks ID-17 Phase 2), or KP/Todoku/Helpan AI sandboxes being live (unblocks ID-11).
+**Recommended first action:**
+
+1. **Operator-side (you):** **(A) staging cutover** — paste-ready, ~5 min of clicking. Then rotate the exposed sandbox secrets.
+2. **Claude-actionable (in a session, no external waiting):** re-read [`../Platform Rails-instruction pack v1-reboot pack v1.2/RECAP.md`](../Platform%20Rails-instruction%20pack%20v1-reboot%20pack%20v1.2/RECAP.md) to refresh cross-rail status. Last full check was 15 May (Helpan AI surged to 111/111). If KP / Todoku / Hakken / LipaStack / Itafika have moved, that may unblock ID-11 or convert one of the Phase-2 follow-ups from "external-gated" to "actionable today". If nothing has moved, every Phase-1 item on this rail is done and the honest answer is *wait for external movement*.
 
 ---
 
