@@ -141,7 +141,12 @@ export interface CustomersRepo {
 // ─── AuthChallengesRepo ───────────────────────────────────────────────────
 
 export type Factor = 'phone_otp' | 'hardware_key' | 'passive_biometric';
-export type ChallengePurpose = 'login' | 'stepup' | 'phone_change_to_old' | 'phone_change_to_new';
+export type ChallengePurpose =
+  | 'login'
+  | 'stepup'
+  | 'phone_change_to_old'
+  | 'phone_change_to_new'
+  | 'operator_webauthn_register';
 export type ChallengeStatus = 'pending' | 'consumed' | 'expired' | 'failed';
 
 export interface AuthChallengeInsert {
@@ -161,6 +166,10 @@ export interface AuthChallengeInsert {
   actor?: StepUpActor;
   /** ID-10: Amendment §A.2 — originating intent class. */
   initiatedBy?: InitiatedBy;
+  /** ID-17: operator-user subject (opu_<ULID>). Mutually exclusive with accountId. */
+  operatorUserId?: string | null;
+  /** ID-17: factor-specific JSON blob (e.g. WebAuthn challenge bytes for hardware_key). */
+  factorData?: Record<string, unknown> | null;
 }
 
 export interface AuthChallenge {
@@ -179,6 +188,8 @@ export interface AuthChallenge {
   operationRiskTier: RiskTier | null;
   actor: StepUpActor | null;
   initiatedBy: InitiatedBy | null;
+  operatorUserId: string | null;
+  factorData: Record<string, unknown> | null;
   createdAt: Date;
 }
 
@@ -227,7 +238,10 @@ export interface StepUpActor {
 
 export interface StepUpTokenInsert {
   jti: string;
-  accountUuid: string;
+  /** Customer subject. Exactly one of accountUuid / operatorUserId is non-null. */
+  accountUuid: string | null;
+  /** ID-17 operator subject. Exactly one of accountUuid / operatorUserId is non-null. */
+  operatorUserId: string | null;
   challengeId: string;
   audience: string;
   operationKind: string;
@@ -622,4 +636,78 @@ export interface PhoneTokensRepo {
   findByJti(jti: string): Promise<PhoneTokenRecord | null>;
   /** Returns the updated record, or null if jti unknown / already revoked. */
   revoke(jti: string, by: string, reason: string): Promise<PhoneTokenRecord | null>;
+}
+
+// ─── ID-17 — Operator users + WebAuthn credentials ────────────────────────
+// Per docs/NEWDOCS_DECISIONS.md Q3: operator step-up is a sub-surface of
+// /v1/stepup/* with `factor=hardware_key` and `operation_kind=operator.*`.
+// Operator users are NOT platform accounts — they exist in their own
+// table; the step-up token's `sub` claim is the operator user_id
+// (opu_<ULID>) instead of the customer account UUID.
+
+export type OperatorUserStatus = 'active' | 'disabled';
+
+export interface OperatorUser {
+  id: string; // opu_<ULID>
+  appId: string;
+  email: string;
+  displayName: string;
+  status: OperatorUserStatus;
+  createdAt: Date;
+  lastLoginAt: Date | null;
+}
+
+export interface OperatorUserInsert {
+  id: string;
+  appId: string;
+  email: string;
+  displayName: string;
+}
+
+export type OperatorUserCreateOutcome =
+  | { kind: 'created'; user: OperatorUser }
+  | { kind: 'email_collision' };
+
+export interface OperatorUsersRepo {
+  create(input: OperatorUserInsert): Promise<OperatorUserCreateOutcome>;
+  findById(id: string): Promise<OperatorUser | null>;
+  findByAppAndEmail(appId: string, email: string): Promise<OperatorUser | null>;
+  recordLogin(id: string, at: Date): Promise<void>;
+}
+
+/**
+ * A registered FIDO2/WebAuthn credential. `publicKeyJwk` is the COSE key
+ * reduced to a JWK-shaped record stored as JSONB. v1.0 stub mode stores
+ * a degenerate placeholder; real attestation lands when WEBAUTHN_STUB_MODE
+ * flips off.
+ */
+export interface OperatorWebauthnCredential {
+  id: string; // opc_<ULID>
+  userId: string;
+  credentialIdB64: string;
+  publicKeyJwk: Record<string, unknown>;
+  signatureCounter: number;
+  attestationFormat: string;
+  transports: readonly string[] | null;
+  displayName: string | null;
+  createdAt: Date;
+  lastUsedAt: Date | null;
+}
+
+export interface OperatorWebauthnCredentialInsert {
+  id: string;
+  userId: string;
+  credentialIdB64: string;
+  publicKeyJwk: Record<string, unknown>;
+  attestationFormat: string;
+  transports?: readonly string[];
+  displayName?: string;
+}
+
+export interface OperatorWebauthnCredentialsRepo {
+  create(input: OperatorWebauthnCredentialInsert): Promise<OperatorWebauthnCredential>;
+  findByCredentialId(credentialIdB64: string): Promise<OperatorWebauthnCredential | null>;
+  listByUser(userId: string): Promise<OperatorWebauthnCredential[]>;
+  /** Bump signature_counter + stamp last_used_at after a successful assertion. */
+  recordUse(id: string, newCounter: number, at: Date): Promise<void>;
 }

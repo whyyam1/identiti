@@ -16,6 +16,8 @@ import { createMemoryPhoneChangesRepo } from '../src/repositories/phoneChanges.m
 import { createMemoryDelegatedAuthoritySigningsRepo } from '../src/repositories/delegatedAuthoritySignings.memory.js';
 import { createMemoryRiderKycRepo } from '../src/repositories/riderKyc.memory.js';
 import { createMemoryKybRepo } from '../src/repositories/kyb.memory.js';
+import { createMemoryOperatorUsersRepo } from '../src/repositories/operatorUsers.memory.js';
+import { createMemoryOperatorWebauthnCredentialsRepo } from '../src/repositories/operatorWebauthnCredentials.memory.js';
 import { loadOrGenerateKeys } from '../src/services/jwtKeys.js';
 import { createJwtSigner } from '../src/services/jwtSigner.js';
 import { createPhoneTokenSigner } from '../src/services/phoneTokenSigner.js';
@@ -29,6 +31,7 @@ import { createStubMpesaProbeService } from '../src/services/mpesaProbeService.j
 import { createStubInsuranceService } from '../src/services/insuranceService.js';
 import { createKybHasher } from '../src/services/kybHash.js';
 import { createStubBrsService } from '../src/services/brsService.js';
+import { createStubWebauthnAdapter } from '../src/services/webauthnAdapter.js';
 
 export const TEST_APP_ID = 'identiti_test_app';
 export const TEST_HMAC_SECRET = 'test-hmac-secret-32-bytes-of-rand';
@@ -88,7 +91,15 @@ export function makeMemCredStore(opts: { suspended?: boolean } = {}): AppCredent
             app_id: TEST_OPERATOR_APP_ID,
             app_name: 'Test operator console',
             tenant_class: 'internal',
-            scopes: ['identiti:operator', 'identiti:customers:read', 'identiti:tier:read'],
+            scopes: [
+              'identiti:operator',
+              'identiti:customers:read',
+              'identiti:tier:read',
+              // ID-17: operator step-up reuses /v1/stepup/* with
+              // operation_kind=operator.* + factor=hardware_key.
+              'identiti:stepup:request',
+              'identiti:stepup:verify',
+            ],
             status: 'active',
           },
           hmacSecret: TEST_OPERATOR_HMAC_SECRET,
@@ -152,6 +163,10 @@ export interface TestDepsBundle extends AppDeps {
   delegatedAuthoritySigningsRepo: ReturnType<typeof createMemoryDelegatedAuthoritySigningsRepo>;
   riderKycRepo: ReturnType<typeof createMemoryRiderKycRepo>;
   kybRepo: ReturnType<typeof createMemoryKybRepo>;
+  operatorUsersRepo: ReturnType<typeof createMemoryOperatorUsersRepo>;
+  operatorWebauthnCredentialsRepo: ReturnType<
+    typeof createMemoryOperatorWebauthnCredentialsRepo
+  >;
   iprsService: ReturnType<typeof createStubIprsService>;
 }
 
@@ -192,6 +207,11 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
   const kybRepo = createMemoryKybRepo();
   const kybHasher = createKybHasher(TEST_KYC_HASH_SALT);
   const brsService = createStubBrsService();
+  const operatorUsersRepo = createMemoryOperatorUsersRepo();
+  const operatorWebauthnCredentialsRepo = createMemoryOperatorWebauthnCredentialsRepo();
+  const webauthnAdapter = createStubWebauthnAdapter({
+    origin: 'http://localhost:3002',
+  });
 
   return {
     env: {
@@ -219,6 +239,9 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
       PHONE_TOKEN_SIGNING_KEY: phoneTokenSigningKey.toString('hex'),
       KYC_HASH_SALT: TEST_KYC_HASH_SALT,
       IPRS_STUB_MODE: true,
+      WEBAUTHN_STUB_MODE: true,
+      WEBAUTHN_RP_ID: 'localhost',
+      WEBAUTHN_ORIGIN: 'http://localhost:3002',
     },
     credentialStore: overrides.credentialStore ?? makeMemCredStore(),
     idempotencyStore: overrides.idempotencyStore ?? makeMemIdempotencyStore(),
@@ -232,6 +255,9 @@ export function makeTestDeps(overrides: TestDepsOverrides = {}): TestDepsBundle 
     delegatedAuthoritySigningsRepo,
     riderKycRepo,
     kybRepo,
+    operatorUsersRepo,
+    operatorWebauthnCredentialsRepo,
+    webauthnAdapter,
     phoneCrypto: createPhoneCrypto({
       encryptionKeyHex: TEST_PHONE_ENCRYPTION_KEY,
       hashSaltHex: TEST_PHONE_HASH_SALT,

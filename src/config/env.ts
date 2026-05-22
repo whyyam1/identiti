@@ -51,6 +51,24 @@ export interface Env {
   KYC_HASH_SALT: string;
   /** When true, IPRS lookups go to the deterministic stub instead of the real upstream. */
   IPRS_STUB_MODE: boolean;
+  /**
+   * ID-17. When true, the WebAuthn adapter accepts any well-shaped assertion
+   * referencing a registered credential and matching the stored challenge —
+   * no signature verification. Production must set false (and a real adapter
+   * must be wired) before operator step-up is trusted.
+   */
+  WEBAUTHN_STUB_MODE: boolean;
+  /**
+   * WebAuthn relying-party id (the host the credential is scoped to;
+   * normally the apex domain serving the operator console).
+   */
+  WEBAUTHN_RP_ID: string;
+  /**
+   * WebAuthn relying-party origin (scheme + host[:port], e.g.
+   * `https://operator.id.identiti.co.ke`). The adapter requires
+   * `clientDataJSON.origin` to match exactly.
+   */
+  WEBAUTHN_ORIGIN: string;
 }
 
 function required(name: string): string {
@@ -164,6 +182,9 @@ export function loadEnv(): Env {
     PHONE_TOKEN_SIGNING_KEY: required('PHONE_TOKEN_SIGNING_KEY'),
     KYC_HASH_SALT: required('KYC_HASH_SALT'),
     IPRS_STUB_MODE: asBool('IPRS_STUB_MODE', optional('IPRS_STUB_MODE', 'true')),
+    WEBAUTHN_STUB_MODE: asBool('WEBAUTHN_STUB_MODE', optional('WEBAUTHN_STUB_MODE', 'true')),
+    WEBAUTHN_RP_ID: optional('WEBAUTHN_RP_ID', 'localhost'),
+    WEBAUTHN_ORIGIN: optional('WEBAUTHN_ORIGIN', 'http://localhost:3002'),
   };
 }
 

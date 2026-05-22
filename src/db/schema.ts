@@ -159,6 +159,12 @@ export const authChallenges = pgTable(
     actorAgentId: text('actor_agent_id'),
     actorDelegatedAuthorityJti: text('actor_delegated_authority_jti'),
     initiatedBy: text('initiated_by'),
+    // ID-17: operator step-up. `operator_user_id` is the subject when the
+    // challenge authenticates an operator console user; mutually exclusive
+    // with `account_id` at the route layer. `factor_data` carries the
+    // WebAuthn server challenge bytes for `factor='hardware_key'`.
+    operatorUserId: text('operator_user_id'),
+    factorData: jsonb('factor_data'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -167,6 +173,7 @@ export const authChallenges = pgTable(
       t.status,
       t.expiresAt,
     ),
+    operatorUserIdx: index('auth_challenges_operator_user_idx').on(t.operatorUserId),
   }),
 );
 
@@ -254,7 +261,12 @@ export const stepUpTokens = pgTable(
   'step_up_tokens',
   {
     jti: text('jti').primaryKey(),
-    accountUuid: text('account_uuid').notNull(),
+    // ID-17: customer subject; nullable when operator_user_id is set.
+    accountUuid: text('account_uuid'),
+    // ID-17: operator-user subject (opu_<ULID>). Exactly one of
+    // (account_uuid, operator_user_id) is non-null — enforced by a
+    // CHECK constraint in migration 0012.
+    operatorUserId: text('operator_user_id'),
     challengeId: text('challenge_id').notNull(),
     audience: text('audience').notNull(),
     operationKind: text('operation_kind').notNull(),
@@ -272,9 +284,50 @@ export const stepUpTokens = pgTable(
   },
   (t) => ({
     accountExpIdx: index('step_up_tokens_account_exp_idx').on(t.accountUuid, t.exp),
+    operatorUserExpIdx: index('step_up_tokens_operator_user_exp_idx').on(
+      t.operatorUserId,
+      t.exp,
+    ),
     delegatedAuthorityIdx: index('step_up_tokens_delegated_authority_idx').on(
       t.delegatedAuthorityJti,
     ),
+  }),
+);
+
+// ─── ID-17 — Operator session (FIDO2/WebAuthn step-up subject) ────────────
+
+export const operatorUsers = pgTable(
+  'operator_users',
+  {
+    id: text('id').primaryKey(),
+    appId: text('app_id').notNull(),
+    email: text('email').notNull(),
+    displayName: text('display_name').notNull(),
+    status: text('status').notNull().default('active'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  },
+  (t) => ({
+    appIdx: index('operator_users_app_idx').on(t.appId),
+  }),
+);
+
+export const operatorWebauthnCredentials = pgTable(
+  'operator_webauthn_credentials',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    credentialIdB64: text('credential_id_b64').notNull().unique(),
+    publicKeyJwk: jsonb('public_key_jwk').notNull(),
+    signatureCounter: integer('signature_counter').notNull().default(0),
+    attestationFormat: text('attestation_format').notNull(),
+    transports: text('transports').array(),
+    displayName: text('display_name'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  },
+  (t) => ({
+    userIdx: index('operator_webauthn_credentials_user_idx').on(t.userId),
   }),
 );
 

@@ -18,6 +18,7 @@ import { errorResponse, generateUlid, successResponse } from '@kmv/platform-shar
 import { createAjv } from '../lib/ajv.js';
 import {
   initiateStepupRequestSchema,
+  isOperatorOperationKind,
   verifyStepupRequestSchema,
   validateStepupTokenRequestSchema,
   STEPUP_TTL_BY_RISK,
@@ -27,6 +28,8 @@ import type {
   AuthChallengesRepo,
   CustomersRepo,
   InitiatedBy,
+  OperatorUsersRepo,
+  OperatorWebauthnCredentialsRepo,
   RiskTier,
   StepUpActor,
   StepUpTokensRepo,
@@ -35,8 +38,11 @@ import type { EventProducer } from '../services/eventProducer.js';
 import type { AuditLogger } from '../services/auditLogger.js';
 import type { JwtSigner } from '../services/jwtSigner.js';
 import type { StepupVerifier } from '../services/stepupVerifier.js';
+import type { WebauthnAdapter } from '../services/webauthnAdapter.js';
 import { generateOtp, hashOtp, verifyOtp, MAX_OTP_ATTEMPTS } from '../services/otp.js';
 import { requireScope } from '../plugins/scope.js';
+
+const OPERATOR_USER_ID_PATTERN = /^opu_[0-9A-HJKMNP-TV-Z]{26}$/;
 
 const ajv = createAjv();
 const validateInitiate = ajv.compile(initiateStepupRequestSchema);
@@ -44,7 +50,9 @@ const validateVerify = ajv.compile(verifyStepupRequestSchema);
 const validateValidateToken = ajv.compile(validateStepupTokenRequestSchema);
 
 interface InitiateBody {
-  account_uuid: string;
+  account_uuid?: string;
+  /** ID-17: required when operation_kind starts with `operator.`. */
+  operator_user_id?: string;
   operation_audience: string;
   operation_kind: string;
   operation_risk_tier: RiskTier;
@@ -59,10 +67,34 @@ interface InitiateBody {
   initiated_by?: InitiatedBy;
 }
 
+/**
+ * ID-17 WebAuthn assertion shape sent at /v1/stepup/verify when the
+ * challenge factor is `hardware_key`. The four base64url-encoded fields
+ * are exactly what the browser emits from
+ * `navigator.credentials.get(...).response`.
+ */
+interface WebauthnAssertionPayload {
+  credential_id_b64: string;
+  client_data_json_b64: string;
+  authenticator_data_b64: string;
+  signature_b64: string;
+}
+
 interface VerifyBody {
   challenge_id: string;
-  response: string | object;
+  response: string | WebauthnAssertionPayload;
   client_device?: unknown;
+}
+
+function isWebauthnAssertion(r: unknown): r is WebauthnAssertionPayload {
+  if (typeof r !== 'object' || r === null) return false;
+  const a = r as Record<string, unknown>;
+  return (
+    typeof a['credential_id_b64'] === 'string' &&
+    typeof a['client_data_json_b64'] === 'string' &&
+    typeof a['authenticator_data_b64'] === 'string' &&
+    typeof a['signature_b64'] === 'string'
+  );
 }
 
 interface ValidateTokenBody {
@@ -76,6 +108,12 @@ export interface StepupRouteDeps {
   customersRepo: CustomersRepo;
   challengesRepo: AuthChallengesRepo;
   stepUpTokensRepo: StepUpTokensRepo;
+  /** ID-17 */
+  operatorUsersRepo: OperatorUsersRepo;
+  /** ID-17 */
+  operatorWebauthnCredentialsRepo: OperatorWebauthnCredentialsRepo;
+  /** ID-17 */
+  webauthnAdapter: WebauthnAdapter;
   eventProducer: EventProducer;
   auditLogger: AuditLogger;
   jwtSigner: JwtSigner;
@@ -107,56 +145,155 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
         }
         const data = request.body as InitiateBody;
 
-        if (!isAccountUuid(data.account_uuid)) {
-          return reply.code(400).send(
-            errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
-              field: 'account_uuid',
-            }),
-          );
+        // ID-17: operator.* operation_kinds require operator_user_id;
+        // every other operation_kind requires account_uuid. They are
+        // mutually exclusive.
+        const operatorMode = isOperatorOperationKind(data.operation_kind);
+        if (operatorMode) {
+          if (!data.operator_user_id) {
+            return reply.code(400).send(
+              errorResponse(
+                'validation_request_invalid',
+                'operator_user_id is required when operation_kind is operator.*',
+                rid,
+                { field: 'operator_user_id' },
+              ),
+            );
+          }
+          if (data.account_uuid) {
+            return reply.code(400).send(
+              errorResponse(
+                'validation_request_invalid',
+                'account_uuid must not be set for operator.* operation_kind; use operator_user_id',
+                rid,
+                { field: 'account_uuid' },
+              ),
+            );
+          }
+          if (!OPERATOR_USER_ID_PATTERN.test(data.operator_user_id)) {
+            return reply.code(400).send(
+              errorResponse(
+                'validation_request_invalid',
+                'operator_user_id is malformed',
+                rid,
+                { field: 'operator_user_id' },
+              ),
+            );
+          }
+        } else {
+          if (!data.account_uuid) {
+            return reply.code(400).send(
+              errorResponse(
+                'validation_request_invalid',
+                'account_uuid is required for non-operator operation_kind',
+                rid,
+                { field: 'account_uuid' },
+              ),
+            );
+          }
+          if (data.operator_user_id) {
+            return reply.code(400).send(
+              errorResponse(
+                'validation_request_invalid',
+                'operator_user_id only applies to operator.* operation_kind',
+                rid,
+                { field: 'operator_user_id' },
+              ),
+            );
+          }
+          if (!isAccountUuid(data.account_uuid)) {
+            return reply.code(400).send(
+              errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
+                field: 'account_uuid',
+              }),
+            );
+          }
         }
 
-        // v1.0 only wires phone_otp end-to-end. hardware_key and
-        // passive_biometric require Phase 5+ adapters; reject up-front.
-        if (data.factor !== 'phone_otp') {
+        // ID-17: customer step-up still requires phone_otp; operator step-up
+        // requires hardware_key. passive_biometric remains adapter-blocked.
+        if (operatorMode) {
+          if (data.factor !== 'hardware_key') {
+            return reply.code(400).send(
+              errorResponse(
+                'auth_factor_unsupported',
+                `Operator step-up requires factor=hardware_key; got ${data.factor}`,
+                rid,
+                { field: 'factor' },
+              ),
+            );
+          }
+        } else if (data.factor !== 'phone_otp') {
           return reply
             .code(400)
             .send(
               errorResponse(
                 'auth_factor_unsupported',
-                `Factor ${data.factor} is not supported in this phase`,
+                `Factor ${data.factor} is not supported for customer step-up`,
                 rid,
                 { field: 'factor' },
               ),
             );
         }
 
-        const account = await deps.customersRepo.findById(data.account_uuid);
-        if (!account) {
-          return reply
-            .code(404)
-            .send(errorResponse('customer_not_found', 'No account with that UUID', rid));
-        }
-        // Step-up requires an active account. Frozen / closed accounts cannot
-        // step up to elevate permissions on a different rail.
-        if (account.state !== 'active') {
-          return reply.code(409).send(
-            errorResponse(
-              'state_invalid_for_action',
-              `Account is in state ${account.state}; step-up requires active`,
-              rid,
-              {
-                detail: {
-                  current_state: account.state,
-                  required_state: 'active',
+        let subjectAccountUuid: string | null = null;
+        let subjectOperatorUserId: string | null = null;
+
+        if (operatorMode) {
+          const opUser = await deps.operatorUsersRepo.findById(data.operator_user_id!);
+          if (!opUser) {
+            return reply
+              .code(404)
+              .send(errorResponse('operator_user_not_found', 'Unknown operator user_id', rid));
+          }
+          if (opUser.status !== 'active') {
+            return reply.code(409).send(
+              errorResponse(
+                'operator_user_disabled',
+                `Operator user is in state ${opUser.status}; cannot step up`,
+                rid,
+              ),
+            );
+          }
+          // Refuse to issue a hardware_key challenge for a user with no
+          // registered credentials — otherwise /verify cannot succeed.
+          const creds = await deps.operatorWebauthnCredentialsRepo.listByUser(opUser.id);
+          if (creds.length === 0) {
+            return reply.code(409).send(
+              errorResponse(
+                'operator_user_no_credentials',
+                'Operator user has no registered WebAuthn credentials; complete /webauthn/register first',
+                rid,
+              ),
+            );
+          }
+          subjectOperatorUserId = opUser.id;
+        } else {
+          const account = await deps.customersRepo.findById(data.account_uuid!);
+          if (!account) {
+            return reply
+              .code(404)
+              .send(errorResponse('customer_not_found', 'No account with that UUID', rid));
+          }
+          if (account.state !== 'active') {
+            return reply.code(409).send(
+              errorResponse(
+                'state_invalid_for_action',
+                `Account is in state ${account.state}; step-up requires active`,
+                rid,
+                {
+                  detail: {
+                    current_state: account.state,
+                    required_state: 'active',
+                  },
                 },
-              },
-            ),
-          );
+              ),
+            );
+          }
+          subjectAccountUuid = account.accountUuid;
         }
 
         const ttlSeconds = STEPUP_TTL_BY_RISK[data.operation_risk_tier];
-        const otp = generateOtp();
-        const otpHash = await hashOtp(otp, deps.otpBcryptRounds);
         const challengeId = `stp_${generateUlid()}`;
         const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
 
@@ -173,39 +310,58 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
           : undefined;
         const challengeInitiatedBy: InitiatedBy | undefined = data.initiated_by;
 
+        // ID-17: factor-specific challenge material.
+        //   - phone_otp:    generate OTP, hash to otpHash, dispatch via Todoku.
+        //   - hardware_key: mint WebAuthn server challenge, stash on factor_data.
+        let otpForDispatch: string | null = null;
+        let otpHashForRow: string | null = null;
+        let webauthnChallengeB64: string | null = null;
+        if (operatorMode) {
+          const c = deps.webauthnAdapter.createChallenge();
+          webauthnChallengeB64 = c.challengeB64;
+        } else {
+          otpForDispatch = generateOtp();
+          otpHashForRow = await hashOtp(otpForDispatch, deps.otpBcryptRounds);
+        }
+
         await deps.challengesRepo.create({
           id: challengeId,
-          accountId: data.account_uuid,
+          accountId: subjectAccountUuid,
           appId,
-          factor: 'phone_otp',
+          factor: data.factor,
           purpose: 'stepup',
-          otpHash,
+          otpHash: otpHashForRow,
           expiresAt,
           intendedOperation: data.operation_kind,
           operationAudience: data.operation_audience,
           operationRiskTier: data.operation_risk_tier,
           ...(challengeActor ? { actor: challengeActor } : {}),
           ...(challengeInitiatedBy ? { initiatedBy: challengeInitiatedBy } : {}),
+          operatorUserId: subjectOperatorUserId,
+          factorData: webauthnChallengeB64 ? { challenge_b64: webauthnChallengeB64 } : null,
         });
 
-        // STEP_UP_REQUIRED → identiti.step_up.events. Todoku consumes and
-        // delivers the OTP. v1.0 sends OTP plaintext in the payload (sandbox);
-        // production will encrypt with Todoku's per-tenant public key per
-        // Reboot Pack §16.8. actor + initiated_by are carried so downstream
-        // audit (Helpan AI, KP, Todoku) can join on the same business op.
+        // STEP_UP_REQUIRED → identiti.step_up.events. Customer step-up
+        // carries the OTP plaintext for Todoku to deliver; operator step-up
+        // carries the WebAuthn challenge bytes the operator's browser will
+        // sign.
         await deps.eventProducer.publish({
           topic: 'identiti.step_up.events',
-          key: data.account_uuid,
+          key: subjectAccountUuid ?? subjectOperatorUserId!,
           type: 'STEP_UP_REQUIRED',
           occurredAt: new Date().toISOString(),
           data: {
-            account_uuid: data.account_uuid,
+            ...(subjectAccountUuid ? { account_uuid: subjectAccountUuid } : {}),
+            ...(subjectOperatorUserId ? { operator_user_id: subjectOperatorUserId } : {}),
             challenge_id: challengeId,
             operation_kind: data.operation_kind,
             operation_risk_tier: data.operation_risk_tier,
             operation_audience: data.operation_audience,
-            factor: 'phone_otp',
-            otp_plaintext: otp,
+            factor: data.factor,
+            ...(otpForDispatch ? { otp_plaintext: otpForDispatch } : {}),
+            ...(webauthnChallengeB64
+              ? { webauthn_challenge_b64: webauthnChallengeB64 }
+              : {}),
             expires_at: expiresAt.toISOString(),
             ...(challengeActor
               ? {
@@ -233,10 +389,12 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
           traceparent: request.traceparent,
           outcome: 'success',
           detail: {
-            account_uuid: data.account_uuid,
+            ...(subjectAccountUuid ? { account_uuid: subjectAccountUuid } : {}),
+            ...(subjectOperatorUserId ? { operator_user_id: subjectOperatorUserId } : {}),
             operation_kind: data.operation_kind,
             operation_risk_tier: data.operation_risk_tier,
             operation_audience: data.operation_audience,
+            factor: data.factor,
             ...(challengeActor
               ? {
                   actor_type: challengeActor.type,
@@ -252,9 +410,10 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
           successResponse(
             {
               challenge_id: challengeId,
-              factor: 'phone_otp' as const,
+              factor: data.factor,
               expires_at: expiresAt.toISOString(),
               delivery_status: 'dispatched' as const,
+              ...(webauthnChallengeB64 ? { webauthn_challenge_b64: webauthnChallengeB64 } : {}),
             },
             rid,
           ),
@@ -314,26 +473,90 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
           }),
         );
       }
-      if (typeof data.response !== 'string') {
-        return reply
-          .code(400)
-          .send(
+      // ID-17: branch on challenge.factor. phone_otp consumes a 6-digit
+      // string response; hardware_key consumes a WebAuthn assertion object
+      // and runs it through the configured adapter.
+      let factorVerified = false;
+      let factorFailureReason: string | null = null;
+      if (challenge.factor === 'hardware_key') {
+        if (!isWebauthnAssertion(data.response)) {
+          return reply.code(400).send(
             errorResponse(
               'auth_factor_unsupported',
-              'Only phone_otp string responses are accepted in this phase',
+              'hardware_key challenge requires a WebAuthn assertion object response',
               rid,
               { field: 'response' },
             ),
           );
-      }
-      if (!challenge.otpHash) {
-        return reply
-          .code(400)
-          .send(errorResponse('auth_factor_unsupported', 'Challenge has no OTP hash', rid));
+        }
+        const challengeBytes =
+          challenge.factorData && typeof challenge.factorData['challenge_b64'] === 'string'
+            ? (challenge.factorData['challenge_b64'] as string)
+            : null;
+        if (!challengeBytes) {
+          return reply
+            .code(500)
+            .send(
+              errorResponse(
+                'INTERNAL_UNSPECIFIED',
+                'hardware_key challenge missing server challenge bytes',
+                rid,
+              ),
+            );
+        }
+        const cred = await deps.operatorWebauthnCredentialsRepo.findByCredentialId(
+          data.response.credential_id_b64,
+        );
+        if (!cred) {
+          factorVerified = false;
+          factorFailureReason = 'webauthn_credential_unknown';
+        } else if (cred.userId !== challenge.operatorUserId) {
+          factorVerified = false;
+          factorFailureReason = 'webauthn_credential_user_mismatch';
+        } else {
+          const verdict = await deps.webauthnAdapter.verifyAssertion({
+            credentialIdB64: data.response.credential_id_b64,
+            clientDataJsonB64: data.response.client_data_json_b64,
+            authenticatorDataB64: data.response.authenticator_data_b64,
+            signatureB64: data.response.signature_b64,
+            serverChallengeB64: challengeBytes,
+            storedPublicKeyJwk: cred.publicKeyJwk,
+            storedSignatureCounter: cred.signatureCounter,
+          });
+          if (verdict.ok) {
+            factorVerified = true;
+            await deps.operatorWebauthnCredentialsRepo.recordUse(
+              cred.id,
+              verdict.newSignatureCounter,
+              new Date(),
+            );
+          } else {
+            factorVerified = false;
+            factorFailureReason = verdict.reason;
+          }
+        }
+      } else {
+        if (typeof data.response !== 'string') {
+          return reply
+            .code(400)
+            .send(
+              errorResponse(
+                'auth_factor_unsupported',
+                'phone_otp challenge requires a string OTP response',
+                rid,
+                { field: 'response' },
+              ),
+            );
+        }
+        if (!challenge.otpHash) {
+          return reply
+            .code(400)
+            .send(errorResponse('auth_factor_unsupported', 'Challenge has no OTP hash', rid));
+        }
+        factorVerified = await verifyOtp(data.response, challenge.otpHash);
       }
 
-      const ok = await verifyOtp(data.response, challenge.otpHash);
-      if (!ok) {
+      if (!factorVerified) {
         const newAttempts = challenge.attemptsUsed + 1;
         const attemptsRemaining = Math.max(0, MAX_OTP_ATTEMPTS - newAttempts);
         if (newAttempts >= MAX_OTP_ATTEMPTS) {
@@ -352,7 +575,11 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
             requestId: rid,
             traceparent: request.traceparent,
             outcome: 'failure',
-            detail: { attempts: newAttempts },
+            detail: {
+              attempts: newAttempts,
+              factor: challenge.factor,
+              ...(factorFailureReason ? { reason: factorFailureReason } : {}),
+            },
           });
           return reply
             .code(401)
@@ -370,19 +597,26 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
           consumedAt: null,
           incrementAttempts: true,
         });
+        const failMessage =
+          challenge.factor === 'hardware_key'
+            ? `WebAuthn assertion rejected: ${factorFailureReason ?? 'unknown'}`
+            : 'Invalid OTP';
         return reply.code(401).send(
-          errorResponse('auth_factor_failed', 'Invalid OTP', rid, {
+          errorResponse('auth_factor_failed', failMessage, rid, {
             detail: { challenge_id: challenge.id, attempts_remaining: attemptsRemaining },
           }),
         );
       }
 
-      // OTP verified — consume challenge, sign step-up token, persist row.
-      const accountUuid = challenge.accountId;
-      if (!accountUuid) {
+      // Factor verified — consume challenge, sign step-up token, persist row.
+      // ID-17: subject is the customer for non-operator step-ups and the
+      // operator-user for operator.* step-ups. Exactly one is set on the
+      // challenge row.
+      const subject = challenge.accountId ?? challenge.operatorUserId;
+      if (!subject) {
         return reply
           .code(500)
-          .send(errorResponse('INTERNAL_UNSPECIFIED', 'Challenge missing account binding', rid));
+          .send(errorResponse('INTERNAL_UNSPECIFIED', 'Challenge missing subject binding', rid));
       }
       const operationKind = challenge.intendedOperation;
       const audience = challenge.operationAudience;
@@ -411,7 +645,7 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
 
       const expiresInSeconds = STEPUP_TTL_BY_RISK[riskTier];
       const signed = await deps.jwtSigner.signStepupToken({
-        sub: accountUuid,
+        sub: subject,
         jti: challenge.id,
         challengeId: challenge.id,
         audience,
@@ -428,7 +662,8 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
 
       await deps.stepUpTokensRepo.create({
         jti: challenge.id,
-        accountUuid,
+        accountUuid: challenge.accountId,
+        operatorUserId: challenge.operatorUserId,
         challengeId: challenge.id,
         audience,
         operationKind,
@@ -441,6 +676,12 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
         ...(challenge.initiatedBy ? { initiatedBy: challenge.initiatedBy } : {}),
       });
 
+      if (challenge.operatorUserId) {
+        // ID-17: stamp the last-login moment now that the operator has
+        // successfully presented hardware_key.
+        await deps.operatorUsersRepo.recordLogin(challenge.operatorUserId, new Date());
+      }
+
       await deps.auditLogger.append({
         appId,
         actorType: 'app',
@@ -452,7 +693,9 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
         traceparent: request.traceparent,
         outcome: 'success',
         detail: {
-          account_uuid: accountUuid,
+          subject,
+          ...(challenge.accountId ? { account_uuid: challenge.accountId } : {}),
+          ...(challenge.operatorUserId ? { operator_user_id: challenge.operatorUserId } : {}),
           operation_kind: operationKind,
           audience,
         },

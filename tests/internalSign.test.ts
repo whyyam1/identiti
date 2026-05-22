@@ -301,6 +301,7 @@ describe('POST /v1/internal/sign', () => {
     await deps.stepUpTokensRepo.create({
       jti: stepUpJti,
       accountUuid: sub,
+      operatorUserId: null,
       challengeId: stepUpJti,
       audience: 'helpan_authority_issuance',
       operationKind: 'helpan_ai.authority_issuance',
@@ -333,6 +334,7 @@ describe('POST /v1/internal/sign', () => {
     await deps.stepUpTokensRepo.create({
       jti: stepUpJti,
       accountUuid: subB, // bound to B
+      operatorUserId: null,
       challengeId: stepUpJti,
       audience: 'helpan_authority_issuance',
       operationKind: 'helpan_ai.authority_issuance',

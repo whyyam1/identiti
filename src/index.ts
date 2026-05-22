@@ -24,6 +24,8 @@ import { createPgPhoneChangesRepo } from './repositories/phoneChanges.js';
 import { createPgDelegatedAuthoritySigningsRepo } from './repositories/delegatedAuthoritySignings.js';
 import { createPgRiderKycRepo } from './repositories/riderKyc.js';
 import { createPgKybRepo } from './repositories/kyb.js';
+import { createPgOperatorUsersRepo } from './repositories/operatorUsers.js';
+import { createPgOperatorWebauthnCredentialsRepo } from './repositories/operatorWebauthnCredentials.js';
 import { createDbAuditLogger } from './services/auditLogger.js';
 import {
   InMemoryEventProducer,
@@ -43,6 +45,7 @@ import { createStubMpesaProbeService } from './services/mpesaProbeService.js';
 import { createStubInsuranceService } from './services/insuranceService.js';
 import { createKybHasher } from './services/kybHash.js';
 import { createStubBrsService } from './services/brsService.js';
+import { createStubWebauthnAdapter } from './services/webauthnAdapter.js';
 import { buildApp } from './app.js';
 
 async function main(): Promise<void> {
@@ -62,6 +65,8 @@ async function main(): Promise<void> {
   const delegatedAuthoritySigningsRepo = createPgDelegatedAuthoritySigningsRepo(db);
   const riderKycRepo = createPgRiderKycRepo(db);
   const kybRepo = createPgKybRepo(db);
+  const operatorUsersRepo = createPgOperatorUsersRepo(db);
+  const operatorWebauthnCredentialsRepo = createPgOperatorWebauthnCredentialsRepo(db);
   const kycHasher = createKycHasher(env.KYC_HASH_SALT);
   const riderHasher = createRiderHasher(env.KYC_HASH_SALT);
   const kybHasher = createKybHasher(env.KYC_HASH_SALT);
@@ -81,6 +86,19 @@ async function main(): Promise<void> {
   const iprsService = createStubIprsService();
   if (env.IPRS_STUB_MODE) {
     logger.warn('IPRS_STUB_MODE=true — using deterministic IPRS stub. Track A access pending.');
+  }
+  // ID-17. The stub WebAuthn adapter is the only adapter shipped in v1.0.
+  // Production must wire a real adapter when operator step-up is trusted.
+  if (!env.WEBAUTHN_STUB_MODE && env.NODE_ENV === 'production') {
+    throw new Error(
+      'WEBAUTHN_STUB_MODE=false in production but no real WebAuthn adapter is wired (newdocs §ID-17)',
+    );
+  }
+  const webauthnAdapter = createStubWebauthnAdapter({ origin: env.WEBAUTHN_ORIGIN });
+  if (env.WEBAUTHN_STUB_MODE) {
+    logger.warn(
+      'WEBAUTHN_STUB_MODE=true — operator step-up uses the stub adapter; assertions are accepted without signature verification.',
+    );
   }
   const phoneCrypto = createPhoneCrypto({
     encryptionKeyHex: env.PHONE_ENCRYPTION_KEY,
@@ -159,6 +177,9 @@ async function main(): Promise<void> {
     delegatedAuthoritySigningsRepo,
     riderKycRepo,
     kybRepo,
+    operatorUsersRepo,
+    operatorWebauthnCredentialsRepo,
+    webauthnAdapter,
     phoneCrypto,
     eventProducer,
     auditLogger,

@@ -33,6 +33,8 @@ function rowToChallenge(r: {
   actorAgentId: string | null;
   actorDelegatedAuthorityJti: string | null;
   initiatedBy: string | null;
+  operatorUserId: string | null;
+  factorData: unknown;
   createdAt: Date;
 }): AuthChallenge {
   return {
@@ -59,6 +61,11 @@ function rowToChallenge(r: {
         }
       : null,
     initiatedBy: (r.initiatedBy as InitiatedBy | null) ?? null,
+    operatorUserId: r.operatorUserId,
+    factorData:
+      r.factorData && typeof r.factorData === 'object'
+        ? (r.factorData as Record<string, unknown>)
+        : null,
     createdAt: r.createdAt,
   };
 }
@@ -83,6 +90,8 @@ export function createPgAuthChallengesRepo(db: Db): AuthChallengesRepo {
           actorAgentId: input.actor?.agentId ?? null,
           actorDelegatedAuthorityJti: input.actor?.delegatedAuthorityJti ?? null,
           initiatedBy: input.initiatedBy ?? null,
+          operatorUserId: input.operatorUserId ?? null,
+          factorData: input.factorData ?? null,
         })
         .returning();
       if (!row) throw new Error('auth_challenges insert returned no row');

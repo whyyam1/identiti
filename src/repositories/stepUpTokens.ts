@@ -19,6 +19,7 @@ export function createPgStepUpTokensRepo(db: Db): StepUpTokensRepo {
       await db.insert(stepUpTokens).values({
         jti: input.jti,
         accountUuid: input.accountUuid,
+        operatorUserId: input.operatorUserId,
         challengeId: input.challengeId,
         audience: input.audience,
         operationKind: input.operationKind,
@@ -48,6 +49,7 @@ export function createPgStepUpTokensRepo(db: Db): StepUpTokensRepo {
       return {
         jti: r.jti,
         accountUuid: r.accountUuid,
+        operatorUserId: r.operatorUserId,
         challengeId: r.challengeId,
         audience: r.audience,
         operationKind: r.operationKind,

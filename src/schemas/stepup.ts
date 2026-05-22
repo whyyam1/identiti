@@ -10,6 +10,7 @@
 
 const ACCOUNT_UUID_PATTERN =
   '^acc_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$';
+const OPERATOR_USER_ID_PATTERN = '^opu_[0-9A-HJKMNP-TV-Z]{26}$';
 const CHALLENGE_ID_PATTERN = '^stp_[0-9A-HJKMNP-TV-Z]{26}$';
 const AGENT_ID_PATTERN = '^agt_[0-9A-HJKMNP-TV-Z]{26}$';
 const DA_JTI_PATTERN = '^daa_[0-9A-HJKMNP-TV-Z]{26}$';
@@ -35,8 +36,30 @@ const OPERATION_KIND_ENUM = [
   'lipastack.payout.high_value',
   'lipastack.admin.key_rotation',
   'lipastack.merchant.dispute_decision',
+  // ID-17 (Operator session surface) — per docs/NEWDOCS_DECISIONS.md Q3:
+  // sub-surface of /v1/stepup/* with factor=hardware_key. The subject of
+  // an operator.* operation_kind is an opu_<ULID>, not an acc_<uuid>.
+  'operator.todoku.template_approve',
+  'operator.todoku.tenant_provision',
+  'operator.todoku.fraud_block_lift',
+  'operator.itafika.kyc_decision',
+  'operator.itafika.dispatch_override',
+  'operator.kws.proforma_approve',
+  'operator.kws.dispatch_assign',
+  'operator.lipastack.merchant_freeze',
+  'operator.lipastack.dispute_decide',
   'app.custom_high_risk',
 ] as const;
+
+/**
+ * ID-17. An operator.* operation_kind binds an operator-user subject
+ * (opu_<ULID>); all others bind a customer subject (acc_<uuid>). The
+ * step-up route consults this prefix when deciding which repo to consult
+ * and what the JWT `sub` claim must be.
+ */
+export function isOperatorOperationKind(kind: string): boolean {
+  return kind.startsWith('operator.');
+}
 
 /**
  * Special-cased audiences that are NOT URI-shaped. Bare-string audiences are
@@ -69,16 +92,15 @@ const actorSchema = {
 export const initiateStepupRequestSchema = {
   $id: 'https://schemas.id.identiti.co.ke/v1/InitiateStepupRequest.json',
   type: 'object',
-  required: [
-    'account_uuid',
-    'operation_audience',
-    'operation_kind',
-    'operation_risk_tier',
-    'factor',
-  ],
+  required: ['operation_audience', 'operation_kind', 'operation_risk_tier', 'factor'],
   additionalProperties: false,
   properties: {
+    // ID-17: customer subject. Required for non-operator.* operation_kinds.
     account_uuid: { type: 'string', pattern: ACCOUNT_UUID_PATTERN },
+    // ID-17: operator-user subject. Required for operator.* operation_kinds.
+    // Exactly one of (account_uuid, operator_user_id) must be present —
+    // enforced at the route layer keyed off operation_kind.
+    operator_user_id: { type: 'string', pattern: OPERATOR_USER_ID_PATTERN },
     operation_audience: operationAudienceSchema,
     operation_kind: { type: 'string', enum: OPERATION_KIND_ENUM },
     operation_risk_tier: { type: 'string', enum: RISK_TIER_ENUM },
@@ -150,7 +172,13 @@ export const validateStepupTokenRequestSchema = {
   properties: {
     stepup_token: { type: 'string', minLength: 1 },
     expected_audience: operationAudienceSchema,
-    expected_subject: { type: 'string', pattern: ACCOUNT_UUID_PATTERN },
+    // ID-17: subject is either a customer (acc_*) or an operator user (opu_*).
+    expected_subject: {
+      oneOf: [
+        { type: 'string', pattern: ACCOUNT_UUID_PATTERN },
+        { type: 'string', pattern: OPERATOR_USER_ID_PATTERN },
+      ],
+    },
     expected_operation_kind: { type: 'string', enum: OPERATION_KIND_ENUM },
   },
 } as const;

@@ -29,6 +29,7 @@ import { kycRoutes } from './routes/kyc.js';
 import { riderKycRoutes } from './routes/riderKyc.js';
 import { kybRoutes } from './routes/kyb.js';
 import { internalRoutes } from './routes/internal.js';
+import { operatorSessionRoutes } from './routes/operatorSession.js';
 import { demoRoutes } from './routes/demo.js';
 import type { Env } from './config/env.js';
 import type { Logger } from './lib/logger.js';
@@ -38,6 +39,8 @@ import type {
   DelegatedAuthoritySigningsRepo,
   KybRepo,
   KycRecordsRepo,
+  OperatorUsersRepo,
+  OperatorWebauthnCredentialsRepo,
   PhoneChangesRepo,
   PhoneTokensRepo,
   RiderKycRepo,
@@ -60,6 +63,7 @@ import type { MpesaProbeService } from './services/mpesaProbeService.js';
 import type { InsuranceService } from './services/insuranceService.js';
 import type { KybHasher } from './services/kybHash.js';
 import type { BrsService } from './services/brsService.js';
+import type { WebauthnAdapter } from './services/webauthnAdapter.js';
 
 export interface AppDeps {
   env: Env;
@@ -75,6 +79,12 @@ export interface AppDeps {
   delegatedAuthoritySigningsRepo: DelegatedAuthoritySigningsRepo;
   riderKycRepo: RiderKycRepo;
   kybRepo: KybRepo;
+  /** ID-17 */
+  operatorUsersRepo: OperatorUsersRepo;
+  /** ID-17 */
+  operatorWebauthnCredentialsRepo: OperatorWebauthnCredentialsRepo;
+  /** ID-17 */
+  webauthnAdapter: WebauthnAdapter;
   phoneCrypto: PhoneCrypto;
   eventProducer: EventProducer;
   auditLogger: AuditLogger;
@@ -218,12 +228,26 @@ export async function buildApp(deps: AppDeps) {
       customersRepo: deps.customersRepo,
       challengesRepo: deps.challengesRepo,
       stepUpTokensRepo: deps.stepUpTokensRepo,
+      operatorUsersRepo: deps.operatorUsersRepo,
+      operatorWebauthnCredentialsRepo: deps.operatorWebauthnCredentialsRepo,
+      webauthnAdapter: deps.webauthnAdapter,
       eventProducer: deps.eventProducer,
       auditLogger: deps.auditLogger,
       jwtSigner: deps.jwtSigner,
       stepupVerifier: deps.stepupVerifier,
       otpBcryptRounds: deps.env.OTP_BCRYPT_ROUNDS,
       envName: deps.env.NODE_ENV,
+    }),
+  );
+  await app.register(
+    operatorSessionRoutes({
+      operatorUsersRepo: deps.operatorUsersRepo,
+      operatorWebauthnCredentialsRepo: deps.operatorWebauthnCredentialsRepo,
+      challengesRepo: deps.challengesRepo,
+      webauthnAdapter: deps.webauthnAdapter,
+      auditLogger: deps.auditLogger,
+      webauthnRpId: deps.env.WEBAUTHN_RP_ID,
+      webauthnOrigin: deps.env.WEBAUTHN_ORIGIN,
     }),
   );
   await app.register(
