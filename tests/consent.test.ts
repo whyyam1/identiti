@@ -90,7 +90,7 @@ function postGrant(app: App, body: string) {
   });
 }
 
-function getConsent(app: App, accountUuid: string, query = ''): ReturnType<App['inject']> {
+function getConsent(app: App, accountUuid: string, query = '') {
   const url = `/v1/consent/${accountUuid}${query}`;
   return app.inject({ method: 'GET', url, headers: signed({ method: 'GET', url }) });
 }

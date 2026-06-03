@@ -129,6 +129,16 @@ export const initiateStepupResponseSchema = {
       type: 'string',
       enum: ['dispatched', 'delivered', 'failed', 'n/a'],
     },
+    /** ID-17: present when factor=hardware_key; the WebAuthn server challenge. */
+    webauthn_challenge_b64: { type: 'string' },
+    /**
+     * Sandbox-only: when env != production AND factor=phone_otp, the OTP
+     * is echoed in the response so integrators without a Todoku→SMS bridge
+     * wired can complete /v1/stepup/verify. Always paired with
+     * `sandbox_only: true`. Production strips both fields.
+     */
+    otp_plaintext: { type: 'string', pattern: '^[0-9]{6}$' },
+    sandbox_only: { type: 'boolean', enum: [true] },
   },
 } as const;
 

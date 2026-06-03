@@ -406,6 +406,16 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
           },
         });
 
+        // Sandbox-only: echo the OTP plaintext in the response so external
+        // integrators can complete /v1/stepup/verify without a Todoku→SMS
+        // bridge wired. Mirrors the otp_plaintext that already lives on
+        // the STEP_UP_REQUIRED Kafka payload in non-prod. Production
+        // strips this — the SMS gateway is the only delivery path.
+        const sandboxOtpEcho =
+          deps.envName !== 'production' && otpForDispatch
+            ? { otp_plaintext: otpForDispatch, sandbox_only: true as const }
+            : null;
+
         return reply.code(201).send(
           successResponse(
             {
@@ -414,6 +424,7 @@ export function stepupRoutes(deps: StepupRouteDeps): FastifyPluginAsync {
               expires_at: expiresAt.toISOString(),
               delivery_status: 'dispatched' as const,
               ...(webauthnChallengeB64 ? { webauthn_challenge_b64: webauthnChallengeB64 } : {}),
+              ...(sandboxOtpEcho ?? {}),
             },
             rid,
           ),

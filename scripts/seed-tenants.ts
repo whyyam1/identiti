@@ -16,6 +16,8 @@
 
 import 'dotenv/config';
 import { randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import postgres from 'postgres';
 
 interface TenantSeed {
@@ -39,14 +41,23 @@ const TENANTS: readonly TenantSeed[] = [
       'identiti:customers:read',
       'identiti:customers:write',
       'identiti:stepup:request',
+      'identiti:stepup:verify',
       'identiti:tier:read',
+      'identiti:consent:read',
+      'identiti:consent:write',
     ],
   },
   {
     appId: 'sandbox_operator',
     appName: 'Sandbox operator console',
     tenantClass: 'internal',
-    scopes: ['identiti:operator', 'identiti:customers:read', 'identiti:tier:read'],
+    scopes: [
+      'identiti:operator',
+      'identiti:customers:read',
+      'identiti:tier:read',
+      'identiti:stepup:request',
+      'identiti:stepup:verify',
+    ],
   },
   {
     appId: 'todoku_internal',
@@ -59,6 +70,24 @@ const TENANTS: readonly TenantSeed[] = [
     appName: 'Helpan AI rail — delegated-authority signing',
     tenantClass: 'internal',
     scopes: ['identiti:internal:sign:delegated_authority'],
+  },
+  // Consumer apps (vs rails). First entry per the 22 May 2026 Lunch Drop
+  // integration ask — same external-tenant treatment as a rail; the
+  // distinction is roster/positioning, not auth posture.
+  // Legal entity: Lunch Drop Limited (a Kirimon Market Ventures company).
+  {
+    appId: 'lunchdrop_sandbox',
+    appName: 'Lunch Drop — Westlands food-delivery pilot',
+    tenantClass: 'external',
+    scopes: [
+      'identiti:customers:read',
+      'identiti:customers:write',
+      'identiti:stepup:request',
+      'identiti:stepup:verify',
+      'identiti:tier:read',
+      'identiti:consent:read',
+      'identiti:consent:write',
+    ],
   },
 ];
 
@@ -84,9 +113,17 @@ async function main(): Promise<void> {
       `;
       if (rows.length > 0) {
         seeded += 1;
+        // Write the secret to a gitignored file rather than echoing to
+        // stdout — the conversation/CI/terminal-history transcripts that
+        // capture stdout count as "in chat". Hand-over via 1Password
+        // sourced from the file, then delete the file.
+        const secretsDir = join(dirname(new URL(import.meta.url).pathname.replace(/^\//, '')), '..', 'secrets');
+        if (!existsSync(secretsDir)) mkdirSync(secretsDir, { recursive: true });
+        const secretFile = join(secretsDir, `${t.appId}.hmac`);
+        writeFileSync(secretFile, hmacSecret, { mode: 0o600 });
         console.log(`SEEDED  ${t.appId}  (${t.tenantClass})`);
-        console.log(`  hmac_secret: ${hmacSecret}`);
-        console.log(`  scopes:      ${t.scopes.join(', ')}`);
+        console.log(`  secret written to: secrets/${t.appId}.hmac  (chmod 0600, gitignored)`);
+        console.log(`  scopes:            ${t.scopes.join(', ')}`);
       } else {
         skipped += 1;
         console.log(`EXISTS  ${t.appId}  — left untouched (secret unchanged)`);
@@ -99,7 +136,7 @@ async function main(): Promise<void> {
   console.log(`\nDone. ${seeded} seeded, ${skipped} already present.`);
   if (seeded > 0) {
     console.log(
-      'Capture the hmac_secret values above now — they are not recoverable in plaintext.',
+      `New secrets written under secrets/*.hmac (gitignored, chmod 0600). Move them into 1Password (or your secrets manager) then 'rm secrets/*.hmac'. They are not recoverable in plaintext.`,
     );
   }
 }
