@@ -173,11 +173,13 @@ No SMS gateway in the loop. No phone whitelist — OTP comes from the response (
 
 What still needs to happen for Lunch Drop to be operational:
 
-1. ✅ `scripts/seed-tenants.ts` updated with `lunchdrop_sandbox` row (committed 22 May 2026 — this PR).
-2. ⏳ **Resume the Supabase project** (`tjqpyblyoslyoplmnlua` in `kipkiren3` org — likely free-tier-paused; see Supabase dashboard).
-3. ⏳ Run `pnpm db:seed`. The secret will appear at `secrets/lunchdrop_sandbox.hmac`.
-4. ⏳ Move secret into 1Password (item: `KMV / Identiti / lunchdrop_sandbox HMAC`). `rm secrets/lunchdrop_sandbox.hmac`.
-5. ⏳ Hand the Railway URL + 1Password share to Lunch Drop.
+1. ✅ `scripts/seed-tenants.ts` updated with `lunchdrop_sandbox` row (committed 22 May 2026).
+2. ✅ Supabase project resumed (operator action, 3 Jun 2026).
+3. ✅ `pnpm db:seed` run against Supabase (3 Jun 2026). Row verified via `node scripts/check-tenant.mjs lunchdrop_sandbox`:
+   - `app_id: lunchdrop_sandbox`, `tenant_class: external`, `status: active`, 7 scopes, 64-char HMAC secret.
+   - Secret on disk at `secrets/lunchdrop_sandbox.hmac` (gitignored).
+4. ⏳ **Operator (Silvia or Cornelius):** move `secrets/lunchdrop_sandbox.hmac` into 1Password — item: `KMV / Identiti / lunchdrop_sandbox HMAC`. Then `rm secrets/lunchdrop_sandbox.hmac`.
+5. ⏳ **Operator:** hand the Railway URL (interim `IDENTITI_API_BASE`) + the 1Password share to Lunch Drop.
 
 ---
 
