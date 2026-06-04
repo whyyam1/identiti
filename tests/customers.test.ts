@@ -50,7 +50,7 @@ function validCreateBody(over: Partial<Record<string, unknown>> = {}): Record<st
       captured_at: new Date().toISOString(),
       captured_via: 'app_onboarding',
     },
-    app_correlation: 'kalunch_user_001',
+    app_correlation: 'lunchdrop_user_001',
     ...over,
   };
 }

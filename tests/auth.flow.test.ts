@@ -203,7 +203,7 @@ describe('POST /v1/auth/customer-token', () => {
     const body = JSON.stringify({
       challenge_id: challengeId,
       response: otp,
-      requested_audience: 'https://kalunch.example/api',
+      requested_audience: 'https://lunchdrop.example/api',
     });
     const res = await app.inject({
       method: 'POST',
@@ -228,7 +228,7 @@ describe('POST /v1/auth/customer-token', () => {
     const keyset = createLocalJWKSet(jwks as unknown as Parameters<typeof createLocalJWKSet>[0]);
     const verified = await jwtVerify(env.data.access_token as string, keyset, {
       issuer: 'https://api.id.identiti.co.ke',
-      audience: 'https://kalunch.example/api',
+      audience: 'https://lunchdrop.example/api',
     });
     expect(verified.payload.sub).toBe(accountUuid);
     expect(verified.payload.session_kind).toBe('primary');
@@ -241,7 +241,7 @@ describe('POST /v1/auth/customer-token', () => {
     const body = JSON.stringify({
       challenge_id: challengeId,
       response: '000000',
-      requested_audience: 'https://kalunch.example/api',
+      requested_audience: 'https://lunchdrop.example/api',
     });
     const res = await app.inject({
       method: 'POST',
@@ -270,7 +270,7 @@ describe('POST /v1/auth/customer-token', () => {
     const wrongBody = JSON.stringify({
       challenge_id: challengeId,
       response: '000001',
-      requested_audience: 'https://kalunch.example/api',
+      requested_audience: 'https://lunchdrop.example/api',
     });
     // 3 wrong attempts.
     for (let i = 0; i < 3; i++) {
@@ -313,7 +313,7 @@ describe('POST /v1/auth/customer-token', () => {
     const body = JSON.stringify({
       challenge_id: 'stp_00000000000000000000000000',
       response: '123456',
-      requested_audience: 'https://kalunch.example/api',
+      requested_audience: 'https://lunchdrop.example/api',
     });
     const res = await app.inject({
       method: 'POST',

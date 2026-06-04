@@ -161,7 +161,7 @@ describe('contract: POST /v1/auth/customer-token (Schema Appendix §2.6)', () =>
     const body = JSON.stringify({
       challenge_id: challengeId,
       response: otp,
-      requested_audience: 'https://kalunch.example/api',
+      requested_audience: 'https://lunchdrop.example/api',
     });
     const res = await app.inject({
       method: 'POST',

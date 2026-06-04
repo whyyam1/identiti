@@ -522,7 +522,7 @@ describe('Customer-token JWT phone_token claim (Schema Appendix §2.7)', () => {
     const tokenBody = JSON.stringify({
       challenge_id: challengeId,
       response: otp,
-      requested_audience: 'https://kalunch.example/api',
+      requested_audience: 'https://lunchdrop.example/api',
     });
     const tk = await app.inject({
       method: 'POST',
@@ -542,7 +542,7 @@ describe('Customer-token JWT phone_token claim (Schema Appendix §2.7)', () => {
     const keyset = createLocalJWKSet(jwks as unknown as Parameters<typeof createLocalJWKSet>[0]);
     const verified = await jwtVerify(tk.json().data.access_token, keyset, {
       issuer: ISSUER,
-      audience: 'https://kalunch.example/api',
+      audience: 'https://lunchdrop.example/api',
     });
 
     const phoneToken = verified.payload.phone_token;

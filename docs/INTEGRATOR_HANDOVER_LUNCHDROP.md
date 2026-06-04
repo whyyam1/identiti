@@ -138,7 +138,7 @@ Mirrors the `otp_plaintext` already on the `STEP_UP_REQUIRED` Kafka payload in n
 `IDENTITI_WEBHOOK_SECRET` is intentionally omitted from the env block. Identiti does NOT sign outbound webhooks today.
 
 - Events flow via **Kafka topics**: `identiti.account.events`, `identiti.kyc.events`, `identiti.kyb.events`, `identiti.consent.events`, `identiti.step_up.events`, `identiti.phone.events`.
-- Webhook delivery (HMAC-signed, 30s→24h retry schedule) is ID-14 Phase 2, ships after the joint design session with Hakken — likely shared infrastructure across all consumer apps. Lunch Drop's `https://kalunchstaging-production.up.railway.app/webhooks/identiti/*` callback base is noted and will be wired then.
+- Webhook delivery (HMAC-signed, 30s→24h retry schedule) is ID-14 Phase 2, ships after the joint design session with Hakken — likely shared infrastructure across all consumer apps. Lunch Drop's staging Railway callback base is `https://<lunchdrop-staging-host>.up.railway.app/webhooks/identiti/*` (host TBC after the in-flight rename of the Railway service from `kalunch` to `lunchdrop`); operator confirms the exact host once Railway is updated, and we wire it then.
 
 Sandbox today: Lunch Drop polls the read endpoints (e.g. `GET /v1/consent/:account_uuid` with `Cache-Control: private, max-age=60`) or, if Kafka is wired on the consumer side, subscribes to the topics directly.
 
