@@ -89,6 +89,27 @@ const TENANTS: readonly TenantSeed[] = [
       'identiti:consent:write',
     ],
   },
+  // Itafika (rail #6, logistics-as-a-service) — needs ID-12 rider-KYC.
+  // 4 Jun 2026 onboarding ask. The 7 scopes are the literal set Itafika
+  // asked for; kyc:read + kyc:write are NOT in Identiti's real scope
+  // catalogue (today rider-KYC routes guard on customers:read/write).
+  // They're granted-as-asked for forward compatibility — no harm if
+  // unused; if a future split lands they're already there.
+  // Legal entity: Kirimon Market Ventures.
+  {
+    appId: 'itafika_sandbox',
+    appName: 'Itafika — logistics-as-a-service (rail #6)',
+    tenantClass: 'external',
+    scopes: [
+      'identiti:customers:read',
+      'identiti:customers:write',
+      'identiti:kyc:read',
+      'identiti:kyc:write',
+      'identiti:stepup:request',
+      'identiti:stepup:verify',
+      'identiti:tier:read',
+    ],
+  },
 ];
 
 async function main(): Promise<void> {
