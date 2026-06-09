@@ -110,6 +110,26 @@ const TENANTS: readonly TenantSeed[] = [
       'identiti:tier:read',
     ],
   },
+  // Klokd (OI-01) — 6 Jun 2026 onboarding ask. Original ask was for
+  // bearer-token + webhook-secret (both wrong for Identiti's surface:
+  // HMAC per request, Kafka in v1.0). Granting the standard 7-scope
+  // integrator set so they're forward-compatible across their use case
+  // (originally framed as KYC + tier + SIM-swap event consumption).
+  // Tenant_class: external. Rail vs consumer-app status TBC.
+  {
+    appId: 'klokd_sandbox',
+    appName: 'Klokd (OI-01)',
+    tenantClass: 'external',
+    scopes: [
+      'identiti:customers:read',
+      'identiti:customers:write',
+      'identiti:stepup:request',
+      'identiti:stepup:verify',
+      'identiti:tier:read',
+      'identiti:consent:read',
+      'identiti:consent:write',
+    ],
+  },
 ];
 
 async function main(): Promise<void> {
