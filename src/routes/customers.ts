@@ -232,5 +232,119 @@ export function customersRoutes(deps: CustomersRouteDeps): FastifyPluginAsync {
         return reply.code(200).send(successResponse(responseData, rid));
       },
     );
+
+    /**
+     * Self-serve activation — App Integration Guide §21.11.4 GAP-1.
+     *
+     * Until this existed, nothing in the rail could move an app-created
+     * account out of `pending_onboarding`: the IPRS path promotes only the
+     * *tier* (`setTier` never writes `status`), and operator `reactivate`
+     * accepts only `frozen_aml`. Step-up requires `active`, so every
+     * payment/payout authorisation was unreachable for a consuming app's real
+     * customers — the app could create users it could never transact for.
+     *
+     * Scoped to `identiti:customers:write` — the same scope that created the
+     * account. The consuming app has already proven phone ownership through
+     * its own onboarding OTP, and Identiti still gates every sensitive
+     * operation behind step-up + tier, so activation alone confers no new
+     * authority. Only `pending_onboarding → active`; AML/KYC freezes are NOT
+     * liftable here (that stays operator-only via `/v1/operator/.../reactivate`).
+     *
+     * Idempotent: an already-active account returns 200, not an error.
+     */
+    fastify.post<{ Params: { uuid: string } }>(
+      '/v1/customers/:uuid/activate',
+      { preHandler: requireScope('identiti:customers:write') },
+      async (request, reply) => {
+        const rid = request.requestId;
+        const appId = request.appId!;
+        const { uuid } = request.params;
+
+        if (!isAccountUuid(uuid)) {
+          return reply.code(400).send(
+            errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
+              field: 'uuid',
+            }),
+          );
+        }
+
+        const result = await deps.customersRepo.changeState(uuid, ['pending_onboarding'], 'active');
+
+        if (!result) {
+          const existing = await deps.customersRepo.findById(uuid);
+          if (!existing) {
+            return reply
+              .code(404)
+              .send(errorResponse('customer_not_found', 'No account with that UUID', rid));
+          }
+          // Already active → idempotent success, so a retry is never an error.
+          if (existing.state === 'active') {
+            return reply.code(200).send(
+              successResponse(
+                {
+                  account_uuid: uuid,
+                  state: existing.state,
+                  already_active: true,
+                },
+                rid,
+              ),
+            );
+          }
+          // frozen_kyc / frozen_aml / closed_* are deliberately not liftable here.
+          return reply.code(409).send(
+            errorResponse(
+              'state_invalid_for_action',
+              `Cannot activate an account in state ${existing.state}`,
+              rid,
+              {
+                detail: {
+                  current_state: existing.state,
+                  allowed_from_states: ['pending_onboarding'],
+                },
+              },
+            ),
+          );
+        }
+
+        const occurredAt = new Date().toISOString();
+        await deps.eventProducer.publish({
+          topic: 'identiti.account.events',
+          key: uuid,
+          type: 'ACCOUNT_ACTIVATED',
+          occurredAt,
+          data: {
+            account_uuid: uuid,
+            from_state: result.fromState,
+            to_state: result.toState,
+            activated_by_app_id: appId,
+          },
+        });
+
+        await deps.auditLogger.append({
+          appId,
+          actorType: 'app',
+          actorId: appId,
+          action: 'customer.activate',
+          resourceType: 'platform_account',
+          resourceId: uuid,
+          requestId: rid,
+          traceparent: request.traceparent,
+          outcome: 'success',
+          detail: { from_state: result.fromState, to_state: result.toState },
+        });
+
+        return reply.code(200).send(
+          successResponse(
+            {
+              account_uuid: uuid,
+              state: result.toState,
+              previous_state: result.fromState,
+              activated_at: occurredAt,
+            },
+            rid,
+          ),
+        );
+      },
+    );
   };
 }

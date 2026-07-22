@@ -189,6 +189,7 @@ export async function buildApp(deps: AppDeps) {
       kycHasher: deps.kycHasher,
       eventProducer: deps.eventProducer,
       auditLogger: deps.auditLogger,
+      envName: deps.env.NODE_ENV,
     }),
   );
   await app.register(

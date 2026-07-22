@@ -55,6 +55,9 @@ const OPERATION_KIND_ENUM = [
   // they depend on it; `app.custom_high_risk` remains the generic fallback.
   'lunchdrop.signin',
   'klokd.payout.worker',
+  // The literal kind Klokd's client sends for high-value worker payouts
+  // (confirmed from their live probe, 22 Jul 2026).
+  'klokd.payout_high_value',
   'app.custom_high_risk',
 ] as const;
 

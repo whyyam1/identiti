@@ -55,6 +55,8 @@ export interface KycRouteDeps {
   kycHasher: KycHasher;
   eventProducer: EventProducer;
   auditLogger: AuditLogger;
+  /** Gates the sandbox-only national-ID-collision discriminator. */
+  envName: string;
 }
 
 function projectArtefact(r: KycRecord): Record<string, unknown> {
@@ -140,9 +142,24 @@ export function kycRoutes(deps: KycRouteDeps): FastifyPluginAsync {
             outcome: 'failure',
             detail: { reason: 'national_id_already_verified_for_other_account' },
           });
+          // The masked code stays `kyc_iprs_no_match` in production so we never
+          // leak which national IDs exist on the platform. In non-production
+          // that masking is actively harmful — it is indistinguishable from a
+          // genuine IPRS no-match, and integrators reusing one test national_id
+          // across accounts conclude the IPRS stub is flaky. Add a sandbox-only
+          // discriminator; production still reveals nothing.
           return reply.code(422).send(
             errorResponse('kyc_iprs_no_match', 'IPRS lookup did not return a usable match', rid, {
-              detail: { lookup_at: new Date().toISOString() },
+              detail: {
+                lookup_at: new Date().toISOString(),
+                ...(deps.envName !== 'production'
+                  ? {
+                      sandbox_reason: 'national_id_already_verified_for_another_account',
+                      sandbox_hint:
+                        'Use a unique national_id per test customer. The IPRS stub is deterministic (unknown ids verify); this 422 is the cross-account uniqueness guard, not a stub failure.',
+                    }
+                  : {}),
+              },
             }),
           );
         }
