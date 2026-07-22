@@ -214,7 +214,12 @@ export function operatorRoutes(deps: OperatorRouteDeps): FastifyPluginAsync {
       buildTransitionHandler(deps, {
         routePath: '/v1/operator/customers/:uuid/reactivate',
         action: 'reactivate',
-        fromStates: ['frozen_aml'],
+        // `pending_onboarding` included per App Integration Guide §21.11.4
+        // GAP-1: nothing else in the rail could move a newly-created account
+        // to `active`, so step-up (which requires `active`) was unreachable
+        // for every app-created customer. Operator-scoped for now; a
+        // self-serve activation path is a separate design decision.
+        fromStates: ['frozen_aml', 'pending_onboarding'],
         toState: 'active',
         eventType: 'ACCOUNT_REACTIVATED',
       }),

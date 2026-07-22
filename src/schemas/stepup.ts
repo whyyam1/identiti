@@ -48,6 +48,13 @@ const OPERATION_KIND_ENUM = [
   'operator.kws.dispatch_assign',
   'operator.lipastack.merchant_freeze',
   'operator.lipastack.dispute_decide',
+  // Per-app consuming-app kinds (App Integration Guide §21.11.4 GAP-4).
+  // `lunchdrop.signin` — Lunch Drop signin step-up (requested 20 Jul 2026).
+  // `klokd.payout.worker` — Klokd worker-payout authorisation, the flow in
+  // App Integration Guide §6.4. Provisional name: confirm with Klokd before
+  // they depend on it; `app.custom_high_risk` remains the generic fallback.
+  'lunchdrop.signin',
+  'klokd.payout.worker',
   'app.custom_high_risk',
 ] as const;
 

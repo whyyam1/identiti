@@ -209,6 +209,15 @@ export function authRoutes(deps: AuthRouteDeps): FastifyPluginAsync {
           detail: { purpose: data.purpose, account_uuid: accountLookup.accountUuid },
         });
 
+        // Sandbox-only: echo the OTP so integrators can complete
+        // /v1/auth/customer-token without a Todoku→SMS bridge. The login OTP
+        // otherwise lives only on the AUTH_CHALLENGE_REQUIRED Kafka payload,
+        // which is unreachable while no broker is wired — leaving customer
+        // login impossible in sandbox (App Integration Guide §21.11.4 GAP-2).
+        // Mirrors the /v1/stepup/challenges echo. Production strips both.
+        const sandboxOtpEcho =
+          deps.envName !== 'production' ? { otp_plaintext: otp, sandbox_only: true as const } : null;
+
         return reply.code(201).send(
           successResponse(
             {
@@ -216,6 +225,7 @@ export function authRoutes(deps: AuthRouteDeps): FastifyPluginAsync {
               factor: 'phone_otp' as const,
               expires_at: expiresAt.toISOString(),
               delivery_status: 'dispatched' as const,
+              ...(sandboxOtpEcho ?? {}),
             },
             rid,
           ),

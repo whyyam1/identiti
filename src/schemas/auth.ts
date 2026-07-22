@@ -60,6 +60,14 @@ export const createChallengeResponseSchema = {
       type: 'string',
       enum: ['dispatched', 'delivered', 'failed', 'n/a'],
     },
+    /**
+     * Sandbox-only (GAP-2): when env != production the login OTP is echoed
+     * here so integrators can complete /v1/auth/customer-token without a
+     * Todoku→SMS bridge. Always paired with `sandbox_only: true`.
+     * Production strips both fields.
+     */
+    otp_plaintext: { type: 'string', pattern: '^[0-9]{6}$' },
+    sandbox_only: { type: 'boolean', enum: [true] },
   },
 } as const;
 
