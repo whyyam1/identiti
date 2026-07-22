@@ -1,6 +1,6 @@
 {
   "name": "@kmv/identiti",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "KMV Platform Rails — Identiti rail API. Source of truth for the Account UUID, KYC tier signal, step-up tokens, phone tokens, and IPRS verification.",
   "license": "UNLICENSED",
