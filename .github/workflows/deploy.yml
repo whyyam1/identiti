@@ -1,0 +1,68 @@
+# Deploy to Railway on every push to main.
+#
+# Why this exists instead of Railway's GitHub integration:
+# the repo is owned by `whyyam1`, but the Railway account is connected as
+# `iamkn1ght`. GitHub App installations are scoped to the repo OWNER, so
+# Railway cannot enumerate this repo under that identity (collaborator access
+# does not help). Authenticating with a Railway *project token* sidesteps the
+# GitHub account linkage entirely.
+#
+# One-time setup:
+#   1. Railway -> project -> Settings -> Tokens -> create a project token
+#      (scoped to the `production` environment).
+#   2. GitHub -> repo Settings -> Secrets and variables -> Actions ->
+#      New repository secret -> name: RAILWAY_TOKEN, value: <the token>
+#
+# Until that secret exists the job runs and cleanly skips, rather than failing.
+
+name: Deploy to Railway
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: railway-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for RAILWAY_TOKEN
+        id: guard
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::warning::RAILWAY_TOKEN is not set — skipping deploy. Add it in repo Settings > Secrets and variables > Actions."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Railway CLI
+        if: steps.guard.outputs.ready == 'true'
+        run: npm i -g @railway/cli
+
+      - name: Deploy
+        if: steps.guard.outputs.ready == 'true'
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up --service identiti --detach
+
+      - name: Verify health
+        if: steps.guard.outputs.ready == 'true'
+        run: |
+          echo "Waiting for the new build to come up..."
+          for i in $(seq 1 30); do
+            body=$(curl -fsS https://identiti-production.up.railway.app/v1/health || true)
+            if echo "$body" | grep -q '"status":"ok"'; then
+              echo "healthy: $body"; exit 0
+            fi
+            sleep 10
+          done
+          echo "::warning::Health check did not report ok within 5 minutes — check the Railway deploy logs."
