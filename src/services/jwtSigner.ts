@@ -47,6 +47,27 @@ export interface StepupTokenClaims {
   initiatedBy?: InitiatedBy;
 }
 
+/**
+ * Cross-rail audience token (R-ID-1 / master RECAP §8 "aud=<rail> customer
+ * JWT"). A lean, single-audience RS256 bearer an app mints server-side for a
+ * whitelisted downstream rail (e.g. Hakken discovery). Unlike the customer
+ * login token it carries no session/scope/tier — it asserts only "this
+ * account_uuid is a known active customer, for this audience" and is marked
+ * `token_use: cross_rail_audience` + `issued_by_app` so a relying rail can
+ * tell it apart from a login-session token. Signed by the step-up key (same
+ * kid published in JWKS), so verification is identical.
+ */
+export interface AudienceTokenClaims {
+  sub: string;
+  jti: string;
+  /** Single audience URI, e.g. `https://hakken.co.ke`. */
+  audience: string;
+  env: string;
+  expiresInSeconds: number;
+  /** The HMAC tenant that requested the mint — recorded in the token + audit. */
+  issuedByApp: string;
+}
+
 export interface JwtSigner {
   signCustomerToken(claims: CustomerTokenClaims): Promise<{
     token: string;
@@ -54,6 +75,11 @@ export interface JwtSigner {
     expiresAt: Date;
   }>;
   signStepupToken(claims: StepupTokenClaims): Promise<{
+    token: string;
+    issuedAt: Date;
+    expiresAt: Date;
+  }>;
+  signAudienceToken(claims: AudienceTokenClaims): Promise<{
     token: string;
     issuedAt: Date;
     expiresAt: Date;
@@ -128,6 +154,28 @@ export function createJwtSigner(opts: JwtSignerOptions): JwtSigner {
         .setSubject(claims.sub)
         .setIssuedAt(iatSec)
         .setNotBefore(iatSec)
+        .setExpirationTime(Math.floor(expiresAt.getTime() / 1000))
+        .setJti(claims.jti)
+        .sign(opts.keyPair.privateKey);
+
+      return { token, issuedAt, expiresAt };
+    },
+
+    async signAudienceToken(claims) {
+      const issuedAt = new Date();
+      const expiresAt = new Date(issuedAt.getTime() + claims.expiresInSeconds * 1000);
+      const iatSec = Math.floor(issuedAt.getTime() / 1000);
+
+      const token = await new SignJWT({
+        token_use: 'cross_rail_audience',
+        issued_by_app: claims.issuedByApp,
+        env: claims.env,
+      })
+        .setProtectedHeader({ alg: 'RS256', typ: 'JWT', kid: opts.keyPair.kid })
+        .setIssuer(opts.issuer)
+        .setAudience([claims.audience])
+        .setSubject(claims.sub)
+        .setIssuedAt(iatSec)
         .setExpirationTime(Math.floor(expiresAt.getTime() / 1000))
         .setJti(claims.jti)
         .sign(opts.keyPair.privateKey);

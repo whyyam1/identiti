@@ -156,6 +156,8 @@ export async function buildApp(deps: AppDeps) {
       phoneCrypto: deps.phoneCrypto,
       eventProducer: deps.eventProducer,
       auditLogger: deps.auditLogger,
+      jwtSigner: deps.jwtSigner,
+      envName: deps.env.NODE_ENV,
     }),
   );
   await app.register(

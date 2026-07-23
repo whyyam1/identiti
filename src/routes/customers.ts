@@ -19,6 +19,7 @@ import type { CustomersRepo } from '../repositories/types.js';
 import type { PhoneCrypto } from '../services/phoneCrypto.js';
 import type { EventProducer } from '../services/eventProducer.js';
 import type { AuditLogger } from '../services/auditLogger.js';
+import type { JwtSigner } from '../services/jwtSigner.js';
 import { requireScope } from '../plugins/scope.js';
 
 const ajv = createAjv();
@@ -49,7 +50,21 @@ export interface CustomersRouteDeps {
   phoneCrypto: PhoneCrypto;
   eventProducer: EventProducer;
   auditLogger: AuditLogger;
+  jwtSigner: JwtSigner;
+  envName: string;
 }
+
+/**
+ * Cross-rail audience token (R-ID-1). Audiences an app may mint a customer
+ * bearer for. Deliberately NARROW: money/identity-sensitive rails
+ * (kipkiren_pay, lipastack) are excluded — a customer bearer minted on app
+ * authority must never be usable to assert a session at a rail that moves
+ * funds. Adding an audience here is a deliberate security decision.
+ */
+const CROSS_RAIL_AUDIENCE_WHITELIST: readonly string[] = ['https://hakken.co.ke'];
+const AUDIENCE_TOKEN_TTL_DEFAULT_SECONDS = 900; // 15 min
+const AUDIENCE_TOKEN_TTL_MIN_SECONDS = 60;
+const AUDIENCE_TOKEN_TTL_MAX_SECONDS = 3600; // 1 h ceiling (JIT posture)
 
 export function customersRoutes(deps: CustomersRouteDeps): FastifyPluginAsync {
   return async (fastify) => {
@@ -340,6 +355,142 @@ export function customersRoutes(deps: CustomersRouteDeps): FastifyPluginAsync {
               state: result.toState,
               previous_state: result.fromState,
               activated_at: occurredAt,
+            },
+            rid,
+          ),
+        );
+      },
+    );
+
+    /**
+     * Cross-rail audience token — App Integration Guide §21.11.4 GAP-2b / R-ID-1.
+     *
+     * Mints a single-audience RS256 customer bearer JWT server-side, keyed on
+     * `account_uuid`, using the app's own HMAC credentials — no customer OTP.
+     * This is what a consuming app hands to a downstream rail (e.g. Hakken:
+     * `Authorization: Bearer <this>`), distinct from the opaque `todoku` phone
+     * token and from the OTP-gated login token.
+     *
+     * TRUST NOTE — this is a deliberately gated capability. The app asserts the
+     * customer's identity to a third rail on its OWN authority (it already owns
+     * the account and proved phone ownership at onboarding). To bound the blast
+     * radius: (1) a dedicated scope `identiti:token:issue` that NO tenant holds
+     * by default — the operator grants it per-app as an explicit decision;
+     * (2) the audience must be on `CROSS_RAIL_AUDIENCE_WHITELIST` (money rails
+     * excluded); (3) the account must be `active`. The token carries no scope,
+     * tier, or session — it cannot authorise anything sensitive by itself
+     * (KP still requires a single-use step-up token for money movement).
+     */
+    fastify.post<{ Params: { uuid: string } }>(
+      '/v1/customers/:uuid/tokens',
+      { preHandler: requireScope('identiti:token:issue') },
+      async (request, reply) => {
+        const rid = request.requestId;
+        const appId = request.appId!;
+        const { uuid } = request.params;
+
+        if (!isAccountUuid(uuid)) {
+          return reply.code(400).send(
+            errorResponse('validation_account_uuid_invalid', 'Account UUID is malformed', rid, {
+              field: 'uuid',
+            }),
+          );
+        }
+
+        const body = (request.body ?? {}) as { audience?: unknown; ttl_seconds?: unknown };
+
+        if (typeof body.audience !== 'string' || body.audience.length === 0) {
+          return reply.code(400).send(
+            errorResponse('validation_request_invalid', '`audience` is required', rid, {
+              field: 'audience',
+            }),
+          );
+        }
+        if (!CROSS_RAIL_AUDIENCE_WHITELIST.includes(body.audience)) {
+          return reply.code(403).send(
+            errorResponse(
+              'token_audience_not_permitted',
+              'This app may not mint a token for that audience',
+              rid,
+              {
+                detail: {
+                  requested_audience: body.audience,
+                  ...(deps.envName !== 'production'
+                    ? { permitted_audiences: CROSS_RAIL_AUDIENCE_WHITELIST }
+                    : {}),
+                },
+              },
+            ),
+          );
+        }
+
+        let ttlSeconds = AUDIENCE_TOKEN_TTL_DEFAULT_SECONDS;
+        if (body.ttl_seconds !== undefined) {
+          if (
+            typeof body.ttl_seconds !== 'number' ||
+            !Number.isInteger(body.ttl_seconds) ||
+            body.ttl_seconds < AUDIENCE_TOKEN_TTL_MIN_SECONDS ||
+            body.ttl_seconds > AUDIENCE_TOKEN_TTL_MAX_SECONDS
+          ) {
+            return reply.code(400).send(
+              errorResponse(
+                'validation_request_invalid',
+                `ttl_seconds must be an integer between ${AUDIENCE_TOKEN_TTL_MIN_SECONDS} and ${AUDIENCE_TOKEN_TTL_MAX_SECONDS}`,
+                rid,
+                { field: 'ttl_seconds' },
+              ),
+            );
+          }
+          ttlSeconds = body.ttl_seconds;
+        }
+
+        const account = await deps.customersRepo.findById(uuid);
+        if (!account) {
+          return reply
+            .code(404)
+            .send(errorResponse('customer_not_found', 'No account with that UUID', rid));
+        }
+        if (account.state !== 'active') {
+          return reply.code(409).send(
+            errorResponse(
+              'state_invalid_for_action',
+              `Cannot mint a token for an account in state ${account.state}`,
+              rid,
+              { detail: { current_state: account.state, required_state: 'active' } },
+            ),
+          );
+        }
+
+        const jti = `cjt_${generateUlid()}`;
+        const signed = await deps.jwtSigner.signAudienceToken({
+          sub: uuid,
+          jti,
+          audience: body.audience,
+          env: deps.envName,
+          expiresInSeconds: ttlSeconds,
+          issuedByApp: appId,
+        });
+
+        await deps.auditLogger.append({
+          appId,
+          actorType: 'app',
+          actorId: appId,
+          action: 'customer.audience_token.issued',
+          resourceType: 'platform_account',
+          resourceId: uuid,
+          requestId: rid,
+          traceparent: request.traceparent,
+          outcome: 'success',
+          detail: { audience: body.audience, jti, expires_at: signed.expiresAt.toISOString() },
+        });
+
+        return reply.code(200).send(
+          successResponse(
+            {
+              token: signed.token,
+              jti,
+              audience: body.audience,
+              expires_at: signed.expiresAt.toISOString(),
             },
             rid,
           ),

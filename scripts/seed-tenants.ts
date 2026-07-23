@@ -110,6 +110,16 @@ const TENANTS: readonly TenantSeed[] = [
       'identiti:tier:read',
     ],
   },
+  // NOTE — scope `identiti:token:issue` (cross-rail audience token, R-ID-1)
+  // is intentionally NOT in any starter set. It lets an app mint a customer
+  // bearer JWT (e.g. aud=https://hakken.co.ke) on its own authority, so it is
+  // granted per-app as a deliberate operator/security decision, not by default.
+  // To grant Klokd its Hakken token: add 'identiti:token:issue' to the
+  // klokd_sandbox scopes array below and re-run `pnpm db:seed` is a no-op for
+  // existing rows — instead ALTER the row:
+  //   UPDATE app_credentials SET scopes = array_append(scopes,'identiti:token:issue')
+  //   WHERE app_id='klokd_sandbox' AND NOT ('identiti:token:issue' = ANY(scopes));
+  //
   // Klokd (OI-01) — 6 Jun 2026 onboarding ask. Original ask was for
   // bearer-token + webhook-secret (both wrong for Identiti's surface:
   // HMAC per request, Kafka in v1.0). Granting the standard 7-scope
