@@ -154,7 +154,7 @@ export function loadEnv(): Env {
   return {
     NODE_ENV,
     PORT: asInt('PORT', optional('PORT', '3002')),
-    RAIL_VERSION: optional('RAIL_VERSION', '0.1.3'),
+    RAIL_VERSION: optional('RAIL_VERSION', '0.1.4'),
     LOG_LEVEL: optional('LOG_LEVEL', NODE_ENV === 'development' ? 'debug' : 'info'),
     DATABASE_URL: required('DATABASE_URL'),
     AUTH_HMAC_TOLERANCE_SECONDS: asInt(

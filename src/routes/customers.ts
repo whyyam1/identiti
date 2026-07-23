@@ -55,13 +55,32 @@ export interface CustomersRouteDeps {
 }
 
 /**
- * Cross-rail audience token (R-ID-1). Audiences an app may mint a customer
- * bearer for. Deliberately NARROW: money/identity-sensitive rails
- * (kipkiren_pay, lipastack) are excluded — a customer bearer minted on app
- * authority must never be usable to assert a session at a rail that moves
- * funds. Adding an audience here is a deliberate security decision.
+ * Cross-rail audience-token policy (R-ID-1). The keys are the ONLY audiences an
+ * app may mint a customer bearer for. Deliberately NARROW: money/identity rails
+ * (kipkiren_pay, lipastack) are excluded — a bearer minted on app authority must
+ * never assert a session at a rail that moves funds. Adding an audience is a
+ * deliberate security decision.
+ *
+ * `sessionShaped` controls the claim set:
+ *  - false (Hakken): lean — iss/aud/sub/jti + token_use/issued_by_app only.
+ *  - true  (Helpan Console): also carries scope/tier/session_kind/session_id,
+ *    because Helpan's verifier 401s without them. The token still carries
+ *    `token_use: cross_rail_audience` + `issued_by_app`, and high-stakes Helpan
+ *    consent grants are independently gated by a fresh Identiti step-up (which
+ *    needs the real customer), so a relying rail is never forced to trust these
+ *    session claims for a sensitive action.
  */
-const CROSS_RAIL_AUDIENCE_WHITELIST: readonly string[] = ['https://hakken.co.ke'];
+const AUDIENCE_POLICY: Readonly<Record<string, { sessionShaped: boolean }>> = {
+  'https://hakken.co.ke': { sessionShaped: false },
+  'https://api.helpan.co.ke': { sessionShaped: true },
+};
+const CROSS_RAIL_AUDIENCE_WHITELIST: readonly string[] = Object.keys(AUDIENCE_POLICY);
+/** Scope set a session-shaped audience token carries — identical to the login token's. */
+const AUDIENCE_SESSION_SCOPES = [
+  'customer:profile_read',
+  'customer:tier_request',
+  'customer:stepup',
+] as const;
 const AUDIENCE_TOKEN_TTL_DEFAULT_SECONDS = 900; // 15 min
 const AUDIENCE_TOKEN_TTL_MIN_SECONDS = 60;
 const AUDIENCE_TOKEN_TTL_MAX_SECONDS = 3600; // 1 h ceiling (JIT posture)
@@ -462,6 +481,7 @@ export function customersRoutes(deps: CustomersRouteDeps): FastifyPluginAsync {
         }
 
         const jti = `cjt_${generateUlid()}`;
+        const sessionShaped = AUDIENCE_POLICY[body.audience]?.sessionShaped ?? false;
         const signed = await deps.jwtSigner.signAudienceToken({
           sub: uuid,
           jti,
@@ -469,6 +489,16 @@ export function customersRoutes(deps: CustomersRouteDeps): FastifyPluginAsync {
           env: deps.envName,
           expiresInSeconds: ttlSeconds,
           issuedByApp: appId,
+          ...(sessionShaped
+            ? {
+                session: {
+                  scope: AUDIENCE_SESSION_SCOPES,
+                  tier: account.tier,
+                  sessionKind: 'primary' as const,
+                  sessionId: `ses_${generateUlid()}`,
+                },
+              }
+            : {}),
         });
 
         await deps.auditLogger.append({

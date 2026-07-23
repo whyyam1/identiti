@@ -66,6 +66,21 @@ export interface AudienceTokenClaims {
   expiresInSeconds: number;
   /** The HMAC tenant that requested the mint — recorded in the token + audit. */
   issuedByApp: string;
+  /**
+   * Optional session-shaped claims for audiences whose verifier expects a
+   * customer session (e.g. the Helpan Console: it 401s without
+   * scope/tier/session_kind). Omitted for lean audiences (Hakken). Even when
+   * present, `token_use: cross_rail_audience` + `issued_by_app` remain, so a
+   * relying rail can still tell this apart from an interactive login and, if it
+   * wants, require a fresh step-up for high-stakes actions rather than trusting
+   * the session claims alone.
+   */
+  session?: {
+    scope: readonly string[];
+    tier: string;
+    sessionKind: 'primary';
+    sessionId: string;
+  };
 }
 
 export interface JwtSigner {
@@ -166,11 +181,19 @@ export function createJwtSigner(opts: JwtSignerOptions): JwtSigner {
       const expiresAt = new Date(issuedAt.getTime() + claims.expiresInSeconds * 1000);
       const iatSec = Math.floor(issuedAt.getTime() / 1000);
 
-      const token = await new SignJWT({
+      const payload: Record<string, unknown> = {
         token_use: 'cross_rail_audience',
         issued_by_app: claims.issuedByApp,
         env: claims.env,
-      })
+      };
+      if (claims.session) {
+        payload.scope = [...claims.session.scope];
+        payload.tier = claims.session.tier;
+        payload.session_kind = claims.session.sessionKind;
+        payload.session_id = claims.session.sessionId;
+      }
+
+      const token = await new SignJWT(payload)
         .setProtectedHeader({ alg: 'RS256', typ: 'JWT', kid: opts.keyPair.kid })
         .setIssuer(opts.issuer)
         .setAudience([claims.audience])
