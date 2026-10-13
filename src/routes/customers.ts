@@ -160,6 +160,41 @@ export function customersRoutes(deps: CustomersRouteDeps): FastifyPluginAsync {
         });
 
         if (result.kind === 'phone_collision') {
+          // The same app registering a number it already registered (after
+          // losing its own link, or retrying a create that timed out) gets its
+          // existing customer back. Another app's customer stays undisclosed:
+          // that case keeps the 400 below, so no app can probe for numbers.
+          const existing = await deps.customersRepo.findByPhoneHash(phoneHash);
+          if (existing && existing.originAppId === appId) {
+            const row = await deps.customersRepo.findById(existing.accountUuid);
+            if (row) {
+              await deps.auditLogger.append({
+                appId,
+                actorType: 'app',
+                actorId: appId,
+                action: 'customer.create.matched_existing',
+                resourceType: 'platform_account',
+                resourceId: existing.accountUuid,
+                requestId: rid,
+                traceparent: request.traceparent,
+                outcome: 'success',
+                detail: { app_correlation: data.app_correlation },
+              });
+              return reply.code(200).send(
+                successResponse(
+                  {
+                    account_uuid: existing.accountUuid,
+                    state: row.state,
+                    tier: row.tier,
+                    created_at: row.createdAt.toISOString(),
+                    existing: true,
+                  },
+                  rid,
+                ),
+              );
+            }
+          }
+
           await deps.auditLogger.append({
             appId,
             actorType: 'app',

@@ -28,6 +28,7 @@ interface StoredAccount {
   phoneEncrypted: string;
   phoneCooldownUntil: Date | null;
   phoneLastChangeAt: Date;
+  originAppId: string;
 }
 
 interface StoredAssignment {
@@ -63,6 +64,7 @@ export function createMemoryCustomersRepo(): CustomersRepo {
         phoneEncrypted: input.phoneEncrypted,
         phoneCooldownUntil: null,
         phoneLastChangeAt: now,
+        originAppId: input.originAppId,
       };
       accounts.set(input.accountUuid, stored);
       phoneHashes.set(input.phoneHash, input.accountUuid);
@@ -104,7 +106,7 @@ export function createMemoryCustomersRepo(): CustomersRepo {
     async findByPhoneHash(phoneHash) {
       const accountUuid = phoneHashes.get(phoneHash);
       if (!accountUuid) return null;
-      return { accountUuid };
+      return { accountUuid, originAppId: accounts.get(accountUuid)?.originAppId ?? '' };
     },
 
     async findEncryptedPhoneFor(accountUuid) {

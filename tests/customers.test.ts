@@ -179,7 +179,7 @@ describe('POST /v1/customers', () => {
     expect(res.statusCode).toBe(201);
   });
 
-  it('rejects a duplicate phone with validation_phone_already_registered', async () => {
+  it('returns the existing customer when the same app registers the phone again', async () => {
     const body1 = JSON.stringify(validCreateBody({ app_correlation: 'first' }));
     const r1 = await app.inject({
       method: 'POST',
@@ -193,7 +193,9 @@ describe('POST /v1/customers', () => {
       payload: body1,
     });
     expect(r1.statusCode).toBe(201);
+    const original = r1.json().data.account_uuid;
 
+    // e.g. the app lost its own link to this customer and signs them up again
     const body2 = JSON.stringify(validCreateBody({ app_correlation: 'second' }));
     const r2 = await app.inject({
       method: 'POST',
@@ -206,8 +208,48 @@ describe('POST /v1/customers', () => {
       }),
       payload: body2,
     });
-    expect(r2.statusCode).toBe(400);
-    expect(r2.json().error.code).toBe('validation_phone_already_registered');
+    expect(r2.statusCode).toBe(200);
+    expect(r2.json().data).toMatchObject({ account_uuid: original, existing: true, state: 'pending_onboarding', tier: 'tier_0' });
+    // No second account and no second ACCOUNT_CREATED event.
+    expect(deps.eventProducer.events.filter((e) => e.type === 'ACCOUNT_CREATED')).toHaveLength(1);
+    expect(deps.auditLogger.entries.some((e) => e.action === 'customer.create.matched_existing')).toBe(true);
+  });
+
+  it("still rejects a phone registered by another app, without revealing the account", async () => {
+    const phone = '+254712345679';
+    await deps.customersRepo.create({
+      accountUuid: 'acc_00000000-0000-4000-8000-000000000001',
+      nameFirst: 'Other',
+      nameLast: 'App',
+      nameMiddle: null,
+      preferredName: null,
+      email: null,
+      appCorrelation: 'other_app_user',
+      originAppId: 'some_other_app',
+      dpaConsentAt: new Date(),
+      kycConsentAt: new Date(),
+      marketingConsent: false,
+      consentCapturedVia: 'app_onboarding',
+      phoneRecordId: '01JTESTPHONERECORD000000001',
+      phoneHash: deps.phoneCrypto.hash(phone),
+      phoneEncrypted: deps.phoneCrypto.encrypt(phone),
+    });
+
+    const body = JSON.stringify(validCreateBody({ phone }));
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/customers',
+      headers: signedHeaders({
+        method: 'POST',
+        url: '/v1/customers',
+        body,
+        idempotencyKey: 'idem-dup-other-app',
+      }),
+      payload: body,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('validation_phone_already_registered');
+    expect(JSON.stringify(res.json())).not.toContain('acc_00000000-0000-4000-8000-000000000001');
     expect(deps.auditLogger.entries.some((e) => e.outcome === 'failure')).toBe(true);
   });
 

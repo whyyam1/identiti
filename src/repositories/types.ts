@@ -115,7 +115,8 @@ export interface SwapPhoneInput {
 export interface CustomersRepo {
   create(input: CustomerInsert): Promise<CreateResult>;
   findById(accountUuid: string): Promise<CustomerRow | null>;
-  findByPhoneHash(phoneHash: string): Promise<{ accountUuid: string } | null>;
+  /** `originAppId` lets an app recognise a customer it created itself (re-link on create). */
+  findByPhoneHash(phoneHash: string): Promise<{ accountUuid: string; originAppId: string } | null>;
   /** AES-256-GCM ciphertext of the bound phone, base64. Phase 6 phone-token resolve. */
   findEncryptedPhoneFor(accountUuid: string): Promise<string | null>;
   /** Phase 7 phone change: read the bound phone record (hash + ciphertext + cooldown). */

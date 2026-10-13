@@ -143,13 +143,14 @@ export function createPgCustomersRepo(db: Db): CustomersRepo {
 
     async findByPhoneHash(phoneHash) {
       const rows = await db
-        .select({ accountId: phoneRecords.accountId })
+        .select({ accountId: phoneRecords.accountId, originAppId: platformAccounts.originAppId })
         .from(phoneRecords)
+        .innerJoin(platformAccounts, eq(platformAccounts.id, phoneRecords.accountId))
         .where(eq(phoneRecords.phoneHash, phoneHash))
         .limit(1);
       const r = rows[0];
       if (!r) return null;
-      return { accountUuid: r.accountId };
+      return { accountUuid: r.accountId, originAppId: r.originAppId };
     },
 
     async findEncryptedPhoneFor(accountUuid) {
