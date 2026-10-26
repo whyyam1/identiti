@@ -30,7 +30,8 @@ const BASE = (process.env.IDENTITI_API_BASE || 'http://localhost:3002').replace(
 const APP_ID = process.env.IDENTITI_APP_ID || 'lunchdrop_sandbox';
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SECRET = (
-  process.env.IDENTITI_APP_SECRET || readFileSync(join(repoRoot, 'secrets', `${APP_ID}.hmac`), 'utf8')
+  process.env.IDENTITI_APP_SECRET ||
+  readFileSync(join(repoRoot, 'secrets', `${APP_ID}.hmac`), 'utf8')
 ).trim();
 
 const sha256Hex = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
@@ -50,7 +51,8 @@ async function call(method, path, body, { signed = true } = {}) {
   }
   if (signed) {
     const canonical = [method.toUpperCase(), path, contentType, ts, sha256Hex(bodyStr)].join('\n');
-    headers['Authorization'] = `Identiti-HMAC-SHA256 app_id=${APP_ID}, signature=${sign(canonical)}`;
+    headers['Authorization'] =
+      `Identiti-HMAC-SHA256 app_id=${APP_ID}, signature=${sign(canonical)}`;
     headers['X-Identiti-Timestamp'] = ts;
   }
   let res, text;
@@ -61,11 +63,16 @@ async function call(method, path, body, { signed = true } = {}) {
     return { status: 0, json: { network_error: String(err?.cause?.code || err?.message || err) } };
   }
   let json;
-  try { json = JSON.parse(text); } catch { json = text; }
+  try {
+    json = JSON.parse(text);
+  } catch {
+    json = text;
+  }
   return { status: res.status, json };
 }
 
-const data = (r) => (r.json && typeof r.json === 'object' && 'data' in r.json ? r.json.data : r.json);
+const data = (r) =>
+  r.json && typeof r.json === 'object' && 'data' in r.json ? r.json.data : r.json;
 let failed = false;
 function show(label, r, ok = (s) => s >= 200 && s < 300) {
   const pass = ok(r.status);
@@ -79,47 +86,107 @@ function show(label, r, ok = (s) => s >= 200 && s < 300) {
 const phone = '+2547' + String(randomInt(10_000_000, 100_000_000));
 console.log(`\nIdentiti smoke → ${BASE}  (tenant ${APP_ID})\n`);
 
-const health = show('GET  /v1/health (unauth)', await call('GET', '/v1/health', undefined, { signed: false }));
+const health = show(
+  'GET  /v1/health (unauth)',
+  await call('GET', '/v1/health', undefined, { signed: false }),
+);
 console.log(`        environment: ${data(health)?.environment ?? '(unknown)'}`);
 
-const created = show('POST /v1/customers', await call('POST', '/v1/customers', {
-  phone, name_first: 'Smoke', name_last: 'Test',
-  consent: { dpa_consent: true, kyc_consent: true, captured_at: new Date().toISOString(), captured_via: 'app_onboarding' },
-  app_correlation: 'smoke-' + Date.now(),
-}));
+const created = show(
+  'POST /v1/customers',
+  await call('POST', '/v1/customers', {
+    phone,
+    name_first: 'Smoke',
+    name_last: 'Test',
+    consent: {
+      dpa_consent: true,
+      kyc_consent: true,
+      captured_at: new Date().toISOString(),
+      captured_via: 'app_onboarding',
+    },
+    app_correlation: 'smoke-' + Date.now(),
+  }),
+);
 const uuid = data(created)?.account_uuid;
 console.log(`        account_uuid: ${uuid ?? '—'}   phone: ${phone}`);
 
-const ch = show('POST /v1/auth/challenges (login)', await call('POST', '/v1/auth/challenges', {
-  phone, factor: 'phone_otp', purpose: 'login',
-}));
+// Self-serve activation (0.1.2, App Integration Guide §21.11.4 GAP-1). New
+// accounts are `pending_onboarding` and step-up requires `active`, so without
+// this the step-up leg below 409s on a perfectly healthy rail. This script was
+// written 17-18 Jul, before /activate shipped on 22 Jul; the gap made the smoke
+// report FAIL against a working host, which is worse than no smoke at all.
+const activated = show(
+  'POST /v1/customers/{uuid}/activate',
+  await call('POST', `/v1/customers/${uuid}/activate`, {}),
+);
+console.log(`        state: ${data(activated)?.state ?? '—'}`);
+
+const ch = show(
+  'POST /v1/auth/challenges (login)',
+  await call('POST', '/v1/auth/challenges', {
+    phone,
+    factor: 'phone_otp',
+    purpose: 'login',
+  }),
+);
 const loginOtp = data(ch)?.otp_plaintext;
-console.log(`        challenge_id: ${data(ch)?.challenge_id ?? '—'}   otp echoed: ${loginOtp ? 'yes' : 'no'}`);
+console.log(
+  `        challenge_id: ${data(ch)?.challenge_id ?? '—'}   otp echoed: ${loginOtp ? 'yes' : 'no'}`,
+);
 
-const tok = show('POST /v1/auth/customer-token', await call('POST', '/v1/auth/customer-token', {
-  challenge_id: data(ch)?.challenge_id, response: loginOtp, requested_audience: 'https://lunchdrop.co.ke',
-}));
-console.log(`        JWT sub match: ${data(tok)?.account_uuid === uuid ? 'yes' : 'no'}   token: ${data(tok)?.access_token ? 'issued' : '—'}`);
+const tok = show(
+  'POST /v1/auth/customer-token',
+  await call('POST', '/v1/auth/customer-token', {
+    challenge_id: data(ch)?.challenge_id,
+    response: loginOtp,
+    requested_audience: 'https://lunchdrop.co.ke',
+  }),
+);
+console.log(
+  `        JWT sub match: ${data(tok)?.account_uuid === uuid ? 'yes' : 'no'}   token: ${data(tok)?.access_token ? 'issued' : '—'}`,
+);
 
-const pt = show('POST /v1/phone-tokens', await call('POST', '/v1/phone-tokens', { account_uuid: uuid }));
+const pt = show(
+  'POST /v1/phone-tokens',
+  await call('POST', '/v1/phone-tokens', { account_uuid: uuid }),
+);
 console.log(`        jti: ${data(pt)?.jti ?? '—'}   aud: ${data(pt)?.audience ?? '—'}`);
 
-const su = show('POST /v1/stepup/challenges', await call('POST', '/v1/stepup/challenges', {
-  account_uuid: uuid, operation_audience: 'https://pay.kipkiren.co.ke',
-  operation_kind: 'kipkiren_pay.redemption', operation_risk_tier: 'medium', factor: 'phone_otp',
-}));
+const su = show(
+  'POST /v1/stepup/challenges',
+  await call('POST', '/v1/stepup/challenges', {
+    account_uuid: uuid,
+    operation_audience: 'https://pay.kipkiren.co.ke',
+    operation_kind: 'kipkiren_pay.redemption',
+    operation_risk_tier: 'medium',
+    factor: 'phone_otp',
+  }),
+);
 const suOtp = data(su)?.otp_plaintext;
-console.log(`        challenge_id: ${data(su)?.challenge_id ?? '—'}   sandbox_only: ${data(su)?.sandbox_only ?? '—'}`);
+console.log(
+  `        challenge_id: ${data(su)?.challenge_id ?? '—'}   sandbox_only: ${data(su)?.sandbox_only ?? '—'}`,
+);
 
-const sv = show('POST /v1/stepup/verify', await call('POST', '/v1/stepup/verify', {
-  challenge_id: data(su)?.challenge_id, response: suOtp,
-}));
-console.log(`        stepup_token: ${data(sv)?.stepup_token ? 'issued' : '—'}   expires_in: ${data(sv)?.expires_in ?? '—'}s`);
+const sv = show(
+  'POST /v1/stepup/verify',
+  await call('POST', '/v1/stepup/verify', {
+    challenge_id: data(su)?.challenge_id,
+    response: suOtp,
+  }),
+);
+console.log(
+  `        stepup_token: ${data(sv)?.stepup_token ? 'issued' : '—'}   expires_in: ${data(sv)?.expires_in ?? '—'}s`,
+);
 
-const tier = show('GET  /v1/customers/{uuid}/tier (signed GET)', uuid
-  ? await call('GET', `/v1/customers/${uuid}/tier`, undefined)
-  : { status: 0, json: 'skipped (no uuid)' });
+const tier = show(
+  'GET  /v1/customers/{uuid}/tier (signed GET)',
+  uuid
+    ? await call('GET', `/v1/customers/${uuid}/tier`, undefined)
+    : { status: 0, json: 'skipped (no uuid)' },
+);
 console.log(`        tier: ${data(tier)?.tier ?? '—'}   reason: ${data(tier)?.reason ?? '—'}`);
 
-console.log(`\n${failed ? 'RESULT: FAIL (see above)' : 'RESULT: PASS — full app-facing surface exercised end-to-end'}\n`);
+console.log(
+  `\n${failed ? 'RESULT: FAIL (see above)' : 'RESULT: PASS — full app-facing surface exercised end-to-end'}\n`,
+);
 process.exit(failed ? 1 : 0);
