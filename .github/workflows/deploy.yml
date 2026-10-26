@@ -13,7 +13,11 @@
 #   2. GitHub -> repo Settings -> Secrets and variables -> Actions ->
 #      New repository secret -> name: RAILWAY_TOKEN, value: <the token>
 #
-# Until that secret exists the job runs and cleanly skips, rather than failing.
+# If that secret is missing the job FAILS LOUDLY. It used to skip quietly, which
+# recreated the exact problem this workflow was built to solve: on 26 Oct 2026 a
+# push appeared to succeed, the job went green, and nothing deployed — live stayed
+# on 0.1.4 while main carried 0.1.5. A deploy pipeline that reports success
+# without deploying is worse than no pipeline.
 
 name: Deploy to Railway
 
@@ -32,37 +36,57 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check for RAILWAY_TOKEN
-        id: guard
+      - name: Require RAILWAY_TOKEN
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           if [ -z "$RAILWAY_TOKEN" ]; then
-            echo "::warning::RAILWAY_TOKEN is not set — skipping deploy. Add it in repo Settings > Secrets and variables > Actions."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "::error::RAILWAY_TOKEN is not set, so this push would NOT deploy."
+            echo "Create a project token: Railway > project > Settings > Tokens (scope: production)."
+            echo "Store it: GitHub > repo Settings > Secrets and variables > Actions > New repository secret, named RAILWAY_TOKEN."
+            exit 1
           fi
 
+      - name: Read expected version
+        id: expected
+        run: |
+          v=$(node -p "require('./package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "Expecting the live rail to report version $v after deploy."
+
       - name: Install Railway CLI
-        if: steps.guard.outputs.ready == 'true'
         run: npm i -g @railway/cli
 
       - name: Deploy
-        if: steps.guard.outputs.ready == 'true'
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: railway up --service identiti --detach
 
-      - name: Verify health
-        if: steps.guard.outputs.ready == 'true'
+      # Verify the DEPLOYED VERSION, not just that something answers. The old
+      # check grepped for '"status":"ok"', which /v1/health returns
+      # unconditionally — it is a static response that does not even touch the
+      # database (src/routes/health.ts). That check passed while nothing had
+      # deployed, which is how 0.1.5 sat undeployed with a green tick.
+      #
+      # Known limit: if a push does NOT bump package.json, live already equals
+      # expected and this passes immediately, so a failed rollout of an
+      # unversioned change still goes unnoticed. Bump the version on anything
+      # you need to confirm is live. Closing that properly needs either a build
+      # id on /v1/health or dropping --detach so the CLI blocks on the build.
+      - name: Verify deployed version
+        env:
+          EXPECTED: ${{ steps.expected.outputs.version }}
         run: |
-          echo "Waiting for the new build to come up..."
-          for i in $(seq 1 30); do
+          echo "Waiting for the live rail to report $EXPECTED ..."
+          for i in $(seq 1 40); do
             body=$(curl -fsS https://identiti-production.up.railway.app/v1/health || true)
-            if echo "$body" | grep -q '"status":"ok"'; then
-              echo "healthy: $body"; exit 0
+            live=$(echo "$body" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+            if [ "$live" = "$EXPECTED" ]; then
+              echo "Deployed: live version is $live"
+              exit 0
             fi
-            sleep 10
+            echo "  attempt $i: live=${live:-<no response>} expected=$EXPECTED"
+            sleep 15
           done
-          echo "::warning::Health check did not report ok within 5 minutes — check the Railway deploy logs."
+          echo "::error::Live version never reached $EXPECTED (last seen: ${live:-<no response>}). The build did not roll out — check the Railway deploy logs."
+          exit 1
