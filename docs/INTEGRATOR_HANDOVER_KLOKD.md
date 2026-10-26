@@ -30,8 +30,13 @@ IDENTITI_APP_SECRET   = <64-char hex; from secrets/klokd_sandbox.hmac after seed
 
 # Webhook secret — DEFERRED to ID-14 Phase 2. Do not set.
 # Per-app inbound HMAC for Identiti→Klokd webhooks ships post-Hakken joint
-# design session. Until then, keep your /webhooks/identiti receiver
-# disabled or returning 503.
+# design session. Until then, keep your receiver disabled or returning 503.
+#
+# Klokd's receiver address, ON FILE ONLY (supplied 10 Oct 2026; supersedes the
+# earlier /webhooks/identiti/* placeholder). Identiti stores this NOWHERE in
+# code, config or DB — there is no webhook delivery to point at it. It is
+# recorded here so ID-14 Phase 2 has the destination when it is built:
+#   https://octopus-api-production.up.railway.app/api/v1/webhooks/rails/identiti
 
 # Cross-rail events — Kafka only in v1.0
 # Subscribe to the topics for events you care about (see §6).
@@ -129,7 +134,7 @@ const headers = {
 
 Identiti emits **events on Kafka topics**, not HMAC-signed webhooks (yet). Webhook delivery is **ID-14 Phase 2** — ships after the joint design session with Hakken, likely as shared infra across all integrators. Until then:
 
-- Klokd's `/webhooks/identiti/*` receiver should stay 503 / disabled.
+- Klokd's receiver should stay 503 / disabled. Its address as of 10 Oct 2026 is `https://octopus-api-production.up.railway.app/api/v1/webhooks/rails/identiti` (replacing the earlier `/webhooks/identiti/*` placeholder) — **recorded for ID-14 Phase 2 only; Identiti holds no webhook URL in code, config or DB and makes no outbound delivery today.**
 - No `IDENTITI_WEBHOOK_SECRET` is issued.
 - Event consumption goes via Kafka subscription (see §6).
 
