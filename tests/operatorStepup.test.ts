@@ -434,6 +434,24 @@ describe('Operator step-up via /v1/stepup/challenges + /v1/stepup/verify', () =>
     });
   }
 
+  it('accepts the five operator.todoku.* kinds added for Todoku (request v1 §6)', async () => {
+    const userId = await createOperatorUser(app, 'todoku-kinds@op.example');
+    await registerStubCredential(app, userId);
+
+    const added = [
+      'operator.todoku.template_reject',
+      'operator.todoku.app_suspend',
+      'operator.todoku.app_reactivate',
+      'operator.todoku.escalation_resolve',
+      'operator.todoku.ticket_resolve',
+    ] as const;
+
+    for (const operationKind of added) {
+      const { challengeId } = await challengeOperator({ operatorUserId: userId, operationKind });
+      expect(challengeId).toMatch(/^stp_[0-9A-HJKMNP-TV-Z]{26}$/);
+    }
+  });
+
   it('happy path: hardware_key challenge + assertion → step-up JWT with sub=opu_*', async () => {
     const userId = await createOperatorUser(app, 'happy@op.example');
     const credentialId = await registerStubCredential(app, userId);

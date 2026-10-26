@@ -61,9 +61,20 @@ const TENANTS: readonly TenantSeed[] = [
   },
   {
     appId: 'todoku_internal',
-    appName: 'Todoku rail — phone-token resolve',
+    appName: 'Todoku rail — phone-token resolve + operator-session check',
     tenantClass: 'internal',
-    scopes: ['phone_token:resolve'],
+    // `identiti:stepup:verify` added 26 Oct 2026 (Todoku integration request
+    // v1 §6): Todoku checks Identiti operator sessions via the non-consuming
+    // POST /v1/stepup/tokens/validate, which guards on that scope. Without it
+    // the operator-console path 403s even once the secret is handed over.
+    //
+    // NOTE — this row was seeded 18 May 2026 and `pnpm db:seed` is
+    // ON CONFLICT DO NOTHING, so re-running it will NOT add the scope to the
+    // live row. The operator must ALTER it (same pattern as Klokd's
+    // identiti:token:issue grant above):
+    //   UPDATE app_credentials SET scopes = array_append(scopes,'identiti:stepup:verify')
+    //   WHERE app_id='todoku_internal' AND NOT ('identiti:stepup:verify' = ANY(scopes));
+    scopes: ['phone_token:resolve', 'identiti:stepup:verify'],
   },
   {
     appId: 'helpan_ai_internal',
@@ -168,7 +179,11 @@ async function main(): Promise<void> {
         // stdout — the conversation/CI/terminal-history transcripts that
         // capture stdout count as "in chat". Hand-over via 1Password
         // sourced from the file, then delete the file.
-        const secretsDir = join(dirname(new URL(import.meta.url).pathname.replace(/^\//, '')), '..', 'secrets');
+        const secretsDir = join(
+          dirname(new URL(import.meta.url).pathname.replace(/^\//, '')),
+          '..',
+          'secrets',
+        );
         if (!existsSync(secretsDir)) mkdirSync(secretsDir, { recursive: true });
         const secretFile = join(secretsDir, `${t.appId}.hmac`);
         writeFileSync(secretFile, hmacSecret, { mode: 0o600 });

@@ -42,6 +42,14 @@ const OPERATION_KIND_ENUM = [
   'operator.todoku.template_approve',
   'operator.todoku.tenant_provision',
   'operator.todoku.fraud_block_lift',
+  // Requested by Todoku 26 Oct 2026 (integration request v1 §6) for their
+  // operator console. Same shape as the three above: subject is an opu_<ULID>,
+  // factor=hardware_key.
+  'operator.todoku.template_reject',
+  'operator.todoku.app_suspend',
+  'operator.todoku.app_reactivate',
+  'operator.todoku.escalation_resolve',
+  'operator.todoku.ticket_resolve',
   'operator.itafika.kyc_decision',
   'operator.itafika.dispatch_override',
   'operator.kws.proforma_approve',
