@@ -18,13 +18,14 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   // Node-script context for the one-off .mjs operator scripts under scripts/.
-  // They run via `node scripts/*.mjs` and need access to `process` / `console`.
+  // They run via `node scripts/*.mjs` and need access to `process` / `console`,
+  // plus `fetch` (Node 18+ global) for the HTTP probes like smoke-identiti.mjs.
   // We intentionally don't pull the `globals` package just for these — only the
-  // two globals we actually use need to be declared.
+  // handful we actually use need to be declared.
   {
     files: ['scripts/**/*.mjs', 'scripts/**/*.js'],
     languageOptions: {
-      globals: { process: 'readonly', console: 'readonly' },
+      globals: { process: 'readonly', console: 'readonly', fetch: 'readonly' },
     },
   },
   prettier,
